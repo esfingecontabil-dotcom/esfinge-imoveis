@@ -1,16 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
 
 const defaultUrl = "https://oohtiefgaelsmvgvtezd.supabase.co";
-const defaultKey = "placeholder-key-anon";
+const defaultKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder";
 
 const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || defaultUrl;
-const supabaseUrl = typeof rawUrl === "string" && rawUrl.trim().startsWith("http")
-  ? rawUrl.replace(/^["']|["']$/g, "").trim()
-  : defaultUrl;
-
 const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || defaultKey;
-const supabaseAnonKey = typeof rawKey === "string" && rawKey.trim().length > 0
-  ? rawKey.replace(/^["']|["']$/g, "").trim()
-  : defaultKey;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Remove eventuais aspas e espaços extras das variáveis de ambiente
+const supabaseUrl = rawUrl.replace(/^["']|["']$/g, "").trim();
+const supabaseAnonKey = rawKey.replace(/^["']|["']$/g, "").trim();
+
+// Garante que a URL seja válida antes de chamar o createClient
+const finalUrl = supabaseUrl.startsWith("http") ? supabaseUrl : defaultUrl;
+const finalKey = supabaseAnonKey.length > 0 ? supabaseAnonKey : defaultKey;
+
+export const supabase = createClient(finalUrl, finalKey);
