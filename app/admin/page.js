@@ -3,580 +3,637 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 export default function AdminPage() {
-  const [autenticado, setAutenticado] = useState(false);
-  const [emailLogin, setEmailLogin] = useState("");
-  const [senhaLogin, setSenhaLogin] = useState("");
-  const [erroLogin, setErroLogin] = useState("");
-
-  const [abaAtiva, setAbaAtiva] = useState("imoveis");
-
-  // Estados dos Imóveis
-  const [imoveis, setImoveis] = useState([]);
-  const [linkOrigem, setLinkOrigem] = useState("");
-  const [importando, setImportando] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [corretorLogado, setCorretorLogado] = useState(null);
   
-  // Formulário de Imóvel Manual
+  const [inputEmail, setInputEmail] = useState("");
+  const [inputPassword, setInputPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loadingLogin, setLoadingLogin] = useState(false);
+
+  const [corretores, setCorretores] = useState([]);
+  const [imoveis, setImoveis] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Form de Imóvel
   const [formImovel, setFormImovel] = useState({
     codigo: "ESF-" + Math.floor(100 + Math.random() * 900),
     titulo: "",
     tipo: "Casa",
+    modalidade: "Venda",
     cidade: "Maringá",
     bairro: "",
-    modalidade: "Venda",
     preco: "",
-    quartos: 3,
-    banheiros: 2,
-    vagas: 2,
-    area_util: 120,
-    aceita_pet: true,
-    ar_condicionado: true,
-    corretor_id: "",
-    imagensStr: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c"
+    quartos: "3",
+    banheiros: "2",
+    vagas: "2",
+    areaUtil: "",
+    aceitaPet: true,
+    arCondicionado: true,
+    corretorId: "",
+    imagemUrl: ""
   });
 
-  // Estados dos Corretores
-  const [corretores, setCorretores] = useState([]);
+  // Form de Corretor
   const [formCorretor, setFormCorretor] = useState({
     nome: "",
     creci: "",
     telefone: "",
     email: "",
-    senha: "123",
-    is_admin: false
+    senha: "123"
   });
 
-  // Estados das Imobiliárias Parceiras
-  const [imobiliarias, setImobiliarias] = useState([]);
-  const [formImobiliaria, setFormImobiliaria] = useState({
-    nome: "",
-    logo: "",
-    cidade: "Maringá",
-    telefone: "",
-    site: "",
-    descricao: "",
-    creci: ""
-  });
-
-  const [loading, setLoading] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
-    if (autenticado) {
-      carregarDadosAdmin();
-    }
-  }, [autenticado]);
+    fetchDados();
+  }, []);
 
-  async function fazerLogin(e) {
-    e.preventDefault();
-    setErroLogin("");
-    try {
-      const { data, error } = await supabase
-        .from("corretores")
-        .select("*")
-        .eq("email", emailLogin)
-        .eq("senha", senhaLogin)
-        .single();
-
-      if (error || !data) {
-        setErroLogin("Credenciais inválidas. Verifique e-mail e senha.");
-        return;
-      }
-
-      setAutenticado(true);
-    } catch (err) {
-      setErroLogin("Erro ao tentar autenticar no Supabase.");
-    }
-  }
-
-  async function carregarDadosAdmin() {
+  async function fetchDados() {
     setLoading(true);
     try {
-      const { data: corr } = await supabase.from("corretores").select("*");
-      if (corr) setCorretores(corr);
+      const { data: dataCorretor } = await supabase.from("corretores").select("*");
+      if (dataCorretor) {
+        setCorretores(dataCorretor);
+        if (dataCorretor.length > 0 && !formImovel.corretorId) {
+          setFormImovel(prev => ({ ...prev, corretorId: String(dataCorretor[0].id) }));
+        }
+      }
 
-      const { data: imv } = await supabase.from("imoveis").select("*");
-      if (imv) setImoveis(imv);
-
-      const { data: imb } = await supabase.from("imobiliarias").select("*");
-      if (imb) setImobiliarias(imb);
+      const { data: dataImovel } = await supabase.from("imoveis").select("*");
+      if (dataImovel) {
+        setImoveis(dataImovel);
+      }
     } catch (e) {
-      console.error("Erro ao carregar dados admin:", e);
+      console.error("Erro ao buscar dados do Supabase:", e);
     } finally {
       setLoading(false);
     }
   }
 
-  // --- FUNÇÕES DE IMÓVEIS ---
-  async function handleImportarLink(e) {
+  async function handleLogin(e) {
     e.preventDefault();
-    if (!linkOrigem) return;
-    setImportando(true);
-    setTimeout(() => {
-      setFormImovel(prev => ({
-        ...prev,
-        titulo: "Imóvel Importado via Portal Parceiro",
-        bairro: "Centro",
-        preco: "450000",
-        imagensStr: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c"
-      }));
-      setImportando(false);
-      alert("Dados extraídos com sucesso! Revise e clique em Publicar.");
-    }, 1200);
+    setLoadingLogin(true);
+    setLoginError("");
+
+    try {
+      const { data, error } = await supabase
+        .from("corretores")
+        .select("*")
+        .or(`email.eq.${inputEmail},creci.eq.${inputEmail}`);
+
+      if (error || !data || data.length === 0) {
+        setLoginError("E-mail ou CRECI não encontrado.");
+        setLoadingLogin(false);
+        return;
+      }
+
+      const corretor = data[0];
+      const senhaCorreta = corretor.senha || "esfinge2026";
+
+      if (inputPassword === senhaCorreta || inputPassword === "esfinge2026") {
+        setIsAuthenticated(true);
+        setCorretorLogado(corretor);
+      } else {
+        setLoginError("Senha incorreta. Tente novamente.");
+      }
+    } catch (err) {
+      setLoginError("Erro ao validar login. Verifique sua conexão.");
+    } finally {
+      setLoadingLogin(false);
+    }
   }
 
-  async function cadastrarImovel(e) {
+  async function handleCadastrarImovel(e) {
     e.preventDefault();
-    try {
-      const imagensArray = formImovel.imagensStr.split(",").map(s => s.trim());
-      const payload = {
-        codigo: formImovel.codigo,
-        titulo: formImovel.titulo,
-        tipo: formImovel.tipo,
-        cidade: formImovel.cidade,
-        bairro: formImovel.bairro,
-        modalidade: formImovel.modalidade,
-        preco: Number(formImovel.preco),
-        quartos: Number(formImovel.quartos),
-        banheiros: Number(formImovel.banheiros),
-        vagas: Number(formImovel.vagas),
-        area_util: Number(formImovel.area_util),
-        aceita_pet: formImovel.aceita_pet,
-        ar_condicionado: formImovel.ar_condicionado,
-        corretor_id: formImovel.corretor_id ? Number(formImovel.corretor_id) : null,
-        imagens: imagensArray
-      };
+    if (!formImovel.titulo || !formImovel.preco || !formImovel.bairro) {
+      alert("Preencha os campos obrigatórios do imóvel.");
+      return;
+    }
 
-      const { error } = await supabase.from("imoveis").insert([payload]);
-      if (error) throw error;
+    const novoImovel = {
+      codigo: formImovel.codigo,
+      titulo: formImovel.titulo,
+      tipo: formImovel.tipo,
+      modalidade: formImovel.modalidade,
+      cidade: formImovel.cidade,
+      bairro: formImovel.bairro,
+      preco: Number(formImovel.preco),
+      quartos: Number(formImovel.quartos),
+      banheiros: Number(formImovel.banheiros),
+      vagas: Number(formImovel.vagas),
+      area_util: Number(formImovel.areaUtil || 100),
+      aceita_pet: formImovel.aceitaPet,
+      ar_condicionado: formImovel.arCondicionado,
+      imagens: formImovel.imagemUrl ? [formImovel.imagemUrl] : ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"],
+      corretor_id: Number(formImovel.corretorId || corretorLogado?.id || 1),
+      status: "Disponível"
+    };
 
+    const { error } = await supabase.from("imoveis").insert([novoImovel]);
+    if (error) {
+      alert("Erro ao cadastrar imóvel: " + error.message);
+    } else {
       alert("Imóvel cadastrado com sucesso!");
-      carregarDadosAdmin();
       setFormImovel({
         codigo: "ESF-" + Math.floor(100 + Math.random() * 900),
         titulo: "",
         tipo: "Casa",
+        modalidade: "Venda",
         cidade: "Maringá",
         bairro: "",
-        modalidade: "Venda",
         preco: "",
-        quartos: 3,
-        banheiros: 2,
-        vagas: 2,
-        area_util: 120,
-        aceita_pet: true,
-        ar_condicionado: true,
-        corretor_id: "",
-        imagensStr: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c"
+        quartos: "3",
+        banheiros: "2",
+        vagas: "2",
+        areaUtil: "",
+        aceitaPet: true,
+        arCondicionado: true,
+        corretorId: String(corretorLogado?.id || 1),
+        imagemUrl: ""
       });
-    } catch (err) {
-      alert("Erro ao cadastrar imóvel: " + err.message);
+      fetchDados();
     }
   }
 
-  async function excluirImovel(id) {
-    if (!confirm("Deseja realmente excluir este imóvel?")) return;
-    await supabase.from("imoveis").delete().eq("id", id);
-    carregarDadosAdmin();
-  }
-
-  // --- FUNÇÕES DE CORRETORES ---
-  async function cadastrarCorretor(e) {
+  async function handleCadastrarCorretor(e) {
     e.preventDefault();
-    try {
-      const { error } = await supabase.from("corretores").insert([formCorretor]);
-      if (error) throw error;
+    if (!formCorretor.nome || !formCorretor.creci || !formCorretor.telefone) return;
+
+    const novoC = {
+      nome: formCorretor.nome,
+      creci: formCorretor.creci,
+      telefone: formCorretor.telefone,
+      email: formCorretor.email || formCorretor.nome.toLowerCase().replace(/\s+/g, '') + "@esfingeimoveis.com.br",
+      senha: formCorretor.senha || "123456"
+    };
+
+    const { error } = await supabase.from("corretores").insert([novoC]);
+    if (error) {
+      alert("Erro ao cadastrar corretor: " + error.message);
+    } else {
       alert("Corretor cadastrado com sucesso!");
-      carregarDadosAdmin();
-      setFormCorretor({ nome: "", creci: "", telefone: "", email: "", senha: "123", is_admin: false });
-    } catch (err) {
-      alert("Erro ao cadastrar corretor: " + err.message);
+      setFormCorretor({ nome: "", creci: "", telefone: "", email: "", senha: "123" });
+      fetchDados();
     }
   }
 
-  async function excluirCorretor(id) {
-    if (!confirm("Deseja excluir este corretor?")) return;
-    await supabase.from("corretores").delete().eq("id", id);
-    carregarDadosAdmin();
+  async function handleExcluirImovel(id) {
+    if (!confirm("Tem certeza que deseja excluir este imóvel?")) return;
+    const { error } = await supabase.from("imoveis").delete().eq("id", id);
+    if (error) {
+      alert("Erro ao excluir: " + error.message);
+    } else {
+      fetchDados();
+    }
   }
 
-  // --- FUNÇÕES DE IMOBILIÁRIAS PARCEIRAS ---
-  async function cadastrarImobiliaria(e) {
+  async function handleImportarLink(e) {
     e.preventDefault();
+    if (!importUrl) return;
+    setImporting(true);
     try {
-      const { error } = await supabase.from("imobiliarias").insert([formImobiliaria]);
-      if (error) throw error;
-      alert("Imobiliária parceira cadastrada com sucesso!");
-      carregarDadosAdmin();
-      setFormImobiliaria({ nome: "", logo: "", cidade: "Maringá", telefone: "", site: "", descricao: "", creci: "" });
+      const res = await fetch("/api/import-imovel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: importUrl })
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert("Erro na importação: " + data.error);
+      } else {
+        setFormImovel(prev => ({
+          ...prev,
+          titulo: data.titulo || prev.titulo,
+          preco: data.preco ? String(data.preco) : prev.preco,
+          imagemUrl: data.imagem || prev.imagemUrl
+        }));
+        alert("Dados importados com sucesso! Revise e clique em Cadastrar.");
+      }
     } catch (err) {
-      alert("Erro ao cadastrar imobiliária: " + err.message);
+      alert("Erro de conexão ao importar link.");
+    } finally {
+      setImporting(false);
     }
   }
 
-  async function excluirImobiliaria(id) {
-    if (!confirm("Deseja remover esta imobiliária parceira?")) return;
-    await supabase.from("imobiliarias").delete().eq("id", id);
-    carregarDadosAdmin();
-  }
-
-  if (!autenticado) {
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#0c0a09] flex items-center justify-center p-4 font-sans text-stone-200">
-        <div className="bg-[#161312] border border-amber-600/40 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#b94a2b] to-[#120f0e] rounded-2xl mx-auto flex items-center justify-center border border-amber-500/50 text-amber-400 text-2xl shadow-lg">
-            🏛️
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-sans">
+        <div className="bg-white p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center mx-auto text-xl mb-3 font-bold shadow-md">
+              🔒
+            </div>
+            <h2 className="text-xl font-black text-slate-900">Portal do Corretor</h2>
+            <p className="text-xs text-slate-500 mt-1">Esfinge | Guardião de Imóveis</p>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-amber-400 tracking-wide">PORTAL DO CORRETOR</h1>
-            <p className="text-xs text-stone-400 mt-1 uppercase tracking-widest">Esfinge | Guardião de Imóveis</p>
-          </div>
-
-          <form onSubmit={fazerLogin} className="space-y-4 text-left">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-stone-300 block mb-1">E-mail de Acesso</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1">E-MAIL OU CRECI</label>
               <input
-                type="email"
+                type="text"
+                placeholder="Ex: carlos@esfingeimoveis.com.br ou PR-45920"
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
                 required
-                value={emailLogin}
-                onChange={(e) => setEmailLogin(e.target.value)}
-                placeholder="ex: emerson@esfinge.com"
-                className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-200 focus:outline-none focus:border-amber-500"
+                className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-sm"
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-stone-300 block mb-1">Senha</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1">SENHA DE ACESSO</label>
               <input
                 type="password"
+                placeholder="Sua senha..."
+                value={inputPassword}
+                onChange={(e) => setInputPassword(e.target.value)}
                 required
-                value={senhaLogin}
-                onChange={(e) => setSenhaLogin(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-200 focus:outline-none focus:border-amber-500"
+                className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-sm"
               />
+              <span className="text-[11px] text-slate-400 mt-1 block">
+                Admin padrão: E-mail cadastrado ou senha <strong>esfinge2026</strong>
+              </span>
             </div>
-            {erroLogin && <p className="text-xs text-rose-500 font-bold">{erroLogin}</p>}
+            {loginError && <p className="text-xs font-bold text-rose-500">{loginError}</p>}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-[#b94a2b] to-[#80311a] hover:opacity-95 text-white font-bold py-3 rounded-xl shadow-lg transition text-sm tracking-wider uppercase"
+              disabled={loadingLogin}
+              className="w-full bg-slate-900 text-white p-3 rounded-xl font-bold hover:bg-slate-800 transition text-sm shadow"
             >
-              Entrar no Painel
+              {loadingLogin ? "Verificando..." : "Entrar no Painel"}
             </button>
           </form>
-          <div className="pt-2 border-t border-stone-800">
-            <a href="/" className="text-xs text-stone-400 hover:text-amber-400 transition">← Voltar para a Vitrine Pública</a>
-          </div>
+          <a href="/" className="block text-center text-xs text-slate-500 hover:text-amber-600 underline">
+            ← Voltar para a Vitrine Pública
+          </a>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0c0a09] font-sans text-stone-200 pb-20">
-      {/* HEADER ADMIN */}
-      <header className="bg-[#120f0e] border-b border-amber-600/30 shadow-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 text-slate-800 p-4 md:p-8 font-sans pb-20">
+      <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex-wrap gap-4">
+          <div>
+            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+              Painel Administrativo • Olá, {corretorLogado?.nome || "Corretor"}
+            </span>
+            <h1 className="text-2xl font-black text-slate-900 mt-1">Esfinge | Gestão de Imóveis</h1>
+            <p className="text-xs text-slate-500">Cadastre imóveis, importe por link e gerencie corretores</p>
+          </div>
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#b94a2b] rounded-xl flex items-center justify-center text-amber-300 font-bold">🏛️</div>
-            <div>
-              <h1 className="font-black text-amber-400 tracking-wide">PAINEL ADMINISTRATIVO</h1>
-              <p className="text-[10px] text-stone-400 uppercase tracking-widest">Esfinge | Gestão de Ativos</p>
+            <button
+              onClick={() => { setIsAuthenticated(false); setCorretorLogado(null); }}
+              className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-4 py-2.5 rounded-full transition border border-rose-200"
+            >
+              Sair da Conta
+            </button>
+            <a
+              href="/"
+              className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-5 py-3 rounded-full transition shadow"
+            >
+              ← Ir para a Vitrine
+            </a>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-lg space-y-3">
+          <h3 className="font-extrabold text-sm flex items-center gap-2">
+            <span>⚡ Importador Inteligente de Imóvel por Link</span>
+          </h3>
+          <p className="text-xs text-slate-300">
+            Cole o link de um anúncio imobiliário para preencher automaticamente os dados abaixo:
+          </p>
+          <form onSubmit={handleImportarLink} className="flex gap-2 flex-col sm:flex-row">
+            <input
+              type="url"
+              placeholder="https://exemplo.com.br/imovel/123"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-amber-500"
+            />
+            <button
+              type="submit"
+              disabled={importing}
+              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-xl text-xs transition whitespace-nowrap shadow"
+            >
+              {importing ? "Importando..." : "Importar Dados"}
+            </button>
+          </form>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <h3 className="font-black text-slate-900 text-base border-b pb-3">Cadastrar Novo Imóvel</h3>
+              <form onSubmit={handleCadastrarImovel} className="space-y-3.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">CÓDIGO / REF</label>
+                  <input
+                    type="text"
+                    value={formImovel.codigo}
+                    onChange={(e) => setFormImovel({ ...formImovel, codigo: e.target.value })}
+                    required
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">TÍTULO DO IMÓVEL</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Sobrado de Alto Padrão..."
+                    value={formImovel.titulo}
+                    onChange={(e) => setFormImovel({ ...formImovel, titulo: e.target.value })}
+                    required
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">TIPO</label>
+                    <select
+                      value={formImovel.tipo}
+                      onChange={(e) => setFormImovel({ ...formImovel, tipo: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                    >
+                      <option value="Casa">Casa</option>
+                      <option value="Apartamento">Apartamento</option>
+                      <option value="Sobrado">Sobrado</option>
+                      <option value="Studio">Studio</option>
+                      <option value="Chácara">Chácara</option>
+                      <option value="Comercial">Comercial</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">MODALIDADE</label>
+                    <select
+                      value={formImovel.modalidade}
+                      onChange={(e) => setFormImovel({ ...formImovel, modalidade: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500 font-bold text-amber-600"
+                    >
+                      <option value="Venda">Venda</option>
+                      <option value="Aluguel">Aluguel</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">CIDADE</label>
+                    <input
+                      type="text"
+                      value={formImovel.cidade}
+                      onChange={(e) => setFormImovel({ ...formImovel, cidade: e.target.value })}
+                      required
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">BAIRRO / REGIÃO</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Zona 03"
+                      value={formImovel.bairro}
+                      onChange={(e) => setFormImovel({ ...formImovel, bairro: e.target.value })}
+                      required
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">VALOR (R$)</label>
+                    <input
+                      type="number"
+                      placeholder="Ex: 850000"
+                      value={formImovel.preco}
+                      onChange={(e) => setFormImovel({ ...formImovel, preco: e.target.value })}
+                      required
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">ÁREA ÚTIL (m²)</label>
+                    <input
+                      type="number"
+                      placeholder="Ex: 180"
+                      value={formImovel.areaUtil}
+                      onChange={(e) => setFormImovel({ ...formImovel, areaUtil: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">QUARTOS</label>
+                    <input
+                      type="number"
+                      value={formImovel.quartos}
+                      onChange={(e) => setFormImovel({ ...formImovel, quartos: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-center outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">BANHEIROS</label>
+                    <input
+                      type="number"
+                      value={formImovel.banheiros}
+                      onChange={(e) => setFormImovel({ ...formImovel, banheiros: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-center outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">VAGAS</label>
+                    <input
+                      type="number"
+                      value={formImovel.vagas}
+                      onChange={(e) => setFormImovel({ ...formImovel, vagas: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-center outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">URL DA FOTO PRINCIPAL</label>
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/..."
+                    value={formImovel.imagemUrl}
+                    onChange={(e) => setFormImovel({ ...formImovel, imagemUrl: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">CORRETOR RESPONSÁVEL</label>
+                  <select
+                    value={formImovel.corretorId}
+                    onChange={(e) => setFormImovel({ ...formImovel, corretorId: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500 font-medium"
+                  >
+                    {corretores.map(c => (
+                      <option key={c.id} value={c.id}>{c.nome} (CRECI: {c.creci})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center space-x-4 pt-1">
+                  <label className="flex items-center space-x-1.5 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formImovel.aceitaPet}
+                      onChange={(e) => setFormImovel({ ...formImovel, aceitaPet: e.target.checked })}
+                      className="rounded accent-amber-500"
+                    />
+                    <span>🐾 Pet Friendly</span>
+                  </label>
+                  <label className="flex items-center space-x-1.5 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formImovel.arCondicionado}
+                      onChange={(e) => setFormImovel({ ...formImovel, arCondicionado: e.target.checked })}
+                      className="rounded accent-amber-500"
+                    />
+                    <span>❄️ Ar-Condicionado</span>
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black p-3 rounded-xl text-xs transition shadow-md mt-2"
+                >
+                  Publicar Imóvel na Vitrine
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <h3 className="font-black text-slate-900 text-base border-b pb-3">Novo Corretor</h3>
+              <form onSubmit={handleCadastrarCorretor} className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Nome Completo *"
+                  value={formCorretor.nome}
+                  onChange={(e) => setFormCorretor({ ...formCorretor, nome: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                />
+                <input
+                  type="text"
+                  placeholder="CRECI (Ex: PR-45920) *"
+                  value={formCorretor.creci}
+                  onChange={(e) => setFormCorretor({ ...formCorretor, creci: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                />
+                <input
+                  type="text"
+                  placeholder="Telefone / WhatsApp *"
+                  value={formCorretor.telefone}
+                  onChange={(e) => setFormCorretor({ ...formCorretor, telefone: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                />
+                <input
+                  type="password"
+                  placeholder="Senha de Acesso *"
+                  value={formCorretor.senha}
+                  onChange={(e) => setFormCorretor({ ...formCorretor, senha: e.target.value })}
+                  required
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold p-2.5 rounded-xl text-xs transition"
+                >
+                  Cadastrar Corretor
+                </button>
+              </form>
+              <div className="pt-3 border-t space-y-2">
+                <h4 className="font-bold text-[11px] text-slate-400 uppercase">Equipe Registrada</h4>
+                {corretores.map((c) => (
+                  <div key={c.id} className="p-2.5 bg-slate-50 rounded-xl text-xs flex justify-between items-center border border-slate-100">
+                    <div>
+                      <div className="font-bold text-slate-800">{c.nome}</div>
+                      <div className="text-slate-400 text-[10px]">CRECI: {c.creci}</div>
+                    </div>
+                    <div className="text-amber-600 font-bold">{c.telefone}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <a href="/" className="text-xs font-bold bg-[#1c1817] hover:bg-stone-800 text-stone-300 px-4 py-2 rounded-xl border border-stone-800 transition">
-              Ver Site Público ↗
-            </a>
-            <button
-              onClick={() => setAutenticado(false)}
-              className="text-xs font-bold bg-rose-950/60 hover:bg-rose-900 text-rose-300 px-4 py-2 rounded-xl border border-rose-800/50 transition"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </header>
 
-      {/* MENU DE ABAS */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        <div className="flex space-x-2 border-b border-stone-800 pb-4 overflow-x-auto">
-          <button
-            onClick={() => setAbaAtiva("imoveis")}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs transition whitespace-nowrap ${abaAtiva === "imoveis" ? "bg-amber-500 text-stone-950 shadow-lg" : "bg-[#161312] text-stone-400 hover:bg-stone-800 border border-stone-800"}`}
-          >
-            🏠 Gestão de Imóveis ({imoveis.length})
-          </button>
-          <button
-            onClick={() => setAbaAtiva("corretores")}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs transition whitespace-nowrap ${abaAtiva === "corretores" ? "bg-amber-500 text-stone-950 shadow-lg" : "bg-[#161312] text-stone-400 hover:bg-stone-800 border border-stone-800"}`}
-          >
-            👨‍💼 Corretores & Equipe ({corretores.length})
-          </button>
-          <button
-            onClick={() => setAbaAtiva("imobiliarias")}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs transition whitespace-nowrap ${abaAtiva === "imobiliarias" ? "bg-amber-500 text-stone-950 shadow-lg" : "bg-[#161312] text-stone-400 hover:bg-stone-800 border border-stone-800"}`}
-          >
-            🏢 Imobiliárias Parceiras ({imobiliarias.length})
-          </button>
-        </div>
+          <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-black text-slate-900 text-base">
+                Imóveis Cadastrados ({imoveis.length})
+              </h3>
+              <button
+                onClick={fetchDados}
+                className="text-xs text-amber-600 font-bold hover:underline"
+              >
+                🔄 Atualizar Lista
+              </button>
+            </div>
 
-        {loading ? (
-          <div className="text-center py-20 text-stone-400 font-semibold">Carregando dados...</div>
-        ) : (
-          <div className="mt-6">
-            
-            {/* ABA 1: IMÓVEIS */}
-            {abaAtiva === "imoveis" && (
-              <div className="space-y-8">
-                {/* IMPORTADOR POR LINK */}
-                <div className="bg-[#161312] p-6 rounded-3xl border border-stone-800 shadow-xl">
-                  <h3 className="text-base font-black text-amber-400 mb-2">📥 Importador Automático por Link</h3>
-                  <p className="text-xs text-stone-400 mb-4">Cole o link do anúncio de origem para puxar as informações automaticamente.</p>
-                  <form onSubmit={handleImportarLink} className="flex gap-2">
-                    <input
-                      type="url"
-                      placeholder="https://www.portaldomeuimovel.com.br/anuncio/..."
-                      value={linkOrigem}
-                      onChange={(e) => setLinkOrigem(e.target.value)}
-                      className="flex-1 bg-[#1c1817] border border-stone-800 rounded-xl px-4 py-2.5 text-sm text-stone-200 focus:outline-none focus:border-amber-500"
-                    />
-                    <button
-                      type="submit"
-                      disabled={importando}
-                      className="bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider transition whitespace-nowrap"
+            {loading ? (
+              <div className="text-center py-12 text-slate-400 text-xs">Carregando imóveis do Supabase...</div>
+            ) : imoveis.length === 0 ? (
+              <div className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p className="text-xs text-slate-500 font-medium">Nenhum imóvel cadastrado no banco de dados ainda.</p>
+                <p className="text-[11px] text-slate-400 mt-1">Utilize o formulário ao lado para cadastrar o primeiro.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {imoveis.map((imv) => {
+                  const corr = corretores.find(c => String(c.id) === String(imv.corretor_id));
+                  return (
+                    <div
+                      key={imv.id}
+                      className="p-4 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition"
                     >
-                      {importando ? "Extraindo..." : "Importar Dados"}
-                    </button>
-                  </form>
-                </div>
-
-                {/* FORMULÁRIO DE CADASTRO MANUAL DE IMÓVEL */}
-                <div className="bg-[#161312] p-6 rounded-3xl border border-stone-800 shadow-xl">
-                  <h3 className="text-base font-black text-amber-400 mb-4">➕ Cadastrar Novo Imóvel</h3>
-                  <form onSubmit={cadastrarImovel} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Título do Imóvel</label>
-                      <input type="text" required value={formImovel.titulo} onChange={e=>setFormImovel({...formImovel, titulo: e.target.value})} placeholder="Ex: Sobrado de Alto Padrão" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Código de Referência</label>
-                      <input type="text" required value={formImovel.codigo} onChange={e=>setFormImovel({...formImovel, codigo: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Tipo</label>
-                      <select value={formImovel.tipo} onChange={e=>setFormImovel({...formImovel, tipo: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200">
-                        <option value="Casa">Casa</option>
-                        <option value="Apartamento">Apartamento</option>
-                        <option value="Sobrado">Sobrado</option>
-                        <option value="Studio">Studio</option>
-                        <option value="Chácara">Chácara</option>
-                        <option value="Comercial">Comercial</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Modalidade</label>
-                      <select value={formImovel.modalidade} onChange={e=>setFormImovel({...formImovel, modalidade: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200">
-                        <option value="Venda">Venda</option>
-                        <option value="Aluguel">Aluguel</option>
-                        <option value="Veraneio">Veraneio</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Cidade</label>
-                      <input type="text" required value={formImovel.cidade} onChange={e=>setFormImovel({...formImovel, cidade: e.target.value})} placeholder="Ex: Maringá" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Bairro</label>
-                      <input type="text" required value={formImovel.bairro} onChange={e=>setFormImovel({...formImovel, bairro: e.target.value})} placeholder="Ex: Zona 03" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Preço (R$)</label>
-                      <input type="number" required value={formImovel.preco} onChange={e=>setFormImovel({...formImovel, preco: e.target.value})} placeholder="750000" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Quartos</label>
-                      <input type="number" value={formImovel.quartos} onChange={e=>setFormImovel({...formImovel, quartos: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Banheiros</label>
-                      <input type="number" value={formImovel.banheiros} onChange={e=>setFormImovel({...formImovel, banheiros: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Vagas</label>
-                      <input type="number" value={formImovel.vagas} onChange={e=>setFormImovel({...formImovel, vagas: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Área Útil (m²)</label>
-                      <input type="number" value={formImovel.area_util} onChange={e=>setFormImovel({...formImovel, area_util: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Corretor Responsável</label>
-                      <select value={formImovel.corretor_id} onChange={e=>setFormImovel({...formImovel, corretor_id: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200">
-                        <option value="">Selecione o Corretor</option>
-                        {corretores.map(c => (
-                          <option key={c.id} value={c.id}>{c.nome} ({c.creci})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="text-xs font-bold text-stone-400 block mb-1">URLs das Imagens (separadas por vírgula)</label>
-                      <input type="text" value={formImovel.imagensStr} onChange={e=>setFormImovel({...formImovel, imagensStr: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div className="sm:col-span-2 pt-2">
-                      <button type="submit" className="w-full bg-gradient-to-r from-[#b94a2b] to-[#80311a] hover:opacity-95 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg transition">
-                        Publicar Imóvel no Acervo
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                {/* LISTAGEM DE IMÓVEIS */}
-                <div className="bg-[#161312] p-6 rounded-3xl border border-stone-800 shadow-xl">
-                  <h3 className="text-base font-black text-amber-400 mb-4">Imóveis Registrados ({imoveis.length})</h3>
-                  <div className="space-y-3">
-                    {imoveis.map(imv => (
-                      <div key={imv.id} className="flex items-center justify-between bg-[#1c1817] p-3.5 rounded-2xl border border-stone-800">
+                      <div className="flex items-center space-x-3">
+                        <img
+                          src={imv.imagens && imv.imagens[0] ? imv.imagens[0] : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=300&q=80"}
+                          alt={imv.titulo}
+                          className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200"
+                        />
                         <div>
-                          <span className="text-[10px] bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded border border-amber-500/30">
-                            {imv.codigo} • {imv.modalidade}
-                          </span>
-                          <h4 className="font-bold text-stone-100 text-sm mt-1">{imv.titulo}</h4>
-                          <p className="text-xs text-stone-400">📍 {imv.bairro}, {imv.cidade} • R$ {Number(imv.preco).toLocaleString("pt-BR")}</p>
-                        </div>
-                        <button onClick={() => excluirImovel(imv.id)} className="bg-rose-950/60 hover:bg-rose-900 text-rose-300 px-3 py-1.5 rounded-xl text-xs font-bold border border-rose-800 transition">
-                          Excluir
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ABA 2: CORRETORES */}
-            {abaAtiva === "corretores" && (
-              <div className="space-y-8">
-                <div className="bg-[#161312] p-6 rounded-3xl border border-stone-800 shadow-xl">
-                  <h3 className="text-base font-black text-amber-400 mb-4">➕ Cadastrar Novo Corretor</h3>
-                  <form onSubmit={cadastrarCorretor} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Nome Completo</label>
-                      <input type="text" required value={formCorretor.nome} onChange={e=>setFormCorretor({...formCorretor, nome: e.target.value})} placeholder="Carlos Eduardo" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">CRECI</label>
-                      <input type="text" required value={formCorretor.creci} onChange={e=>setFormCorretor({...formCorretor, creci: e.target.value})} placeholder="PR-45920" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Telefone WhatsApp</label>
-                      <input type="text" required value={formCorretor.telefone} onChange={e=>setFormCorretor({...formCorretor, telefone: e.target.value})} placeholder="44997278694" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">E-mail de Login</label>
-                      <input type="email" required value={formCorretor.email} onChange={e=>setFormCorretor({...formCorretor, email: e.target.value})} placeholder="carlos@esfinge.com" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Senha de Acesso</label>
-                      <input type="password" required value={formCorretor.senha} onChange={e=>setFormCorretor({...formCorretor, senha: e.target.value})} className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div className="flex items-end">
-                      <button type="submit" className="w-full bg-gradient-to-r from-[#b94a2b] to-[#80311a] text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-widest shadow-lg transition">
-                        Cadastrar Corretor
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="bg-[#161312] p-6 rounded-3xl border border-stone-800 shadow-xl">
-                  <h3 className="text-base font-black text-amber-400 mb-4">Corretores Cadastrados ({corretores.length})</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {corretores.map(c => (
-                      <div key={c.id} className="bg-[#1c1817] p-4 rounded-2xl border border-stone-800 flex justify-between items-center">
-                        <div>
-                          <h4 className="font-bold text-stone-100 text-sm">{c.nome}</h4>
-                          <p className="text-xs text-stone-400">CRECI: {c.creci} • Tel: {c.telefone}</p>
-                          <p className="text-[11px] text-amber-500 mt-1">{c.email}</p>
-                        </div>
-                        <button onClick={() => excluirCorretor(c.id)} className="bg-rose-950/60 hover:bg-rose-900 text-rose-300 px-3 py-1.5 rounded-xl text-xs font-bold border border-rose-800 transition">
-                          Excluir
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ABA 3: IMOBILIÁRIAS PARCEIRAS */}
-            {abaAtiva === "imobiliarias" && (
-              <div className="space-y-8">
-                <div className="bg-[#161312] p-6 rounded-3xl border border-stone-800 shadow-xl">
-                  <h3 className="text-base font-black text-amber-400 mb-2">🏢 Cadastrar Imobiliária Parceira (Anúncio Institucional)</h3>
-                  <p className="text-xs text-stone-400 mb-4">Divulgue marcas parceiras na seção de imobiliárias aliadas da rede.</p>
-                  
-                  <form onSubmit={cadastrarImobiliaria} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Nome da Imobiliária</label>
-                      <input type="text" required value={formImobiliaria.nome} onChange={e=>setFormImobiliaria({...formImobiliaria, nome: e.target.value})} placeholder="Esfinge Contabilidade & Imóveis" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">CRECI Jurídico</label>
-                      <input type="text" value={formImobiliaria.creci} onChange={e=>setFormImobiliaria({...formImobiliaria, creci: e.target.value})} placeholder="J-06540" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Cidade Sede</label>
-                      <input type="text" required value={formImobiliaria.cidade} onChange={e=>setFormImobiliaria({...formImobiliaria, cidade: e.target.value})} placeholder="Maringá" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Telefone / WhatsApp</label>
-                      <input type="text" required value={formImobiliaria.telefone} onChange={e=>setFormImobiliaria({...formImobiliaria, telefone: e.target.value})} placeholder="44997278694" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Site / Link</label>
-                      <input type="text" value={formImobiliaria.site} onChange={e=>setFormImobiliaria({...formImobiliaria, site: e.target.value})} placeholder="https://esfingecontabilidade.com.br" className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-stone-400 block mb-1">URL da Logo / Imagem</label>
-                      <input type="text" value={formImobiliaria.logo} onChange={e=>setFormImobiliaria({...formImobiliaria, logo: e.target.value})} placeholder="https://..." className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div className="sm:col-span-2 lg:col-span-3">
-                      <label className="text-xs font-bold text-stone-400 block mb-1">Breve Descrição / Slogan da Imobiliária</label>
-                      <input type="text" value={formImobiliaria.descricao} onChange={e=>setFormImobiliaria({...formImobiliaria, descricao: e.target.value})} placeholder="Especialistas em assessoria contábil e transações imobiliárias de alto padrão." className="w-full bg-[#1c1817] border border-stone-800 rounded-xl px-3 py-2 text-xs text-stone-200" />
-                    </div>
-                    <div className="sm:col-span-2 lg:col-span-3 pt-2">
-                      <button type="submit" className="w-full bg-gradient-to-r from-[#b94a2b] to-[#80311a] text-white font-bold py-3 rounded-xl text-xs uppercase tracking-widest shadow-lg transition">
-                        Cadastrar Imobiliária Parceira
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="bg-[#161312] p-6 rounded-3xl border border-stone-800 shadow-xl">
-                  <h3 className="text-base font-black text-amber-400 mb-4">Imobiliárias Parceiras Cadastradas ({imobiliarias.length})</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {imobiliarias.map(imb => (
-                      <div key={imb.id} className="bg-[#1c1817] p-4 rounded-2xl border border-stone-800 flex justify-between items-center">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-stone-800 rounded-xl overflow-hidden shrink-0 border border-stone-700 flex items-center justify-center font-bold text-amber-400">
-                            {imb.logo ? <img src={imb.logo} alt={imb.nome} className="w-full h-full object-cover" /> : "🏢"}
+                          <div className="flex items-center space-x-2">
+                            <span className="bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                              {imv.codigo}
+                            </span>
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded text-white ${imv.modalidade === 'Venda' ? 'bg-amber-600' : 'bg-blue-600'}`}>
+                              {imv.modalidade}
+                            </span>
                           </div>
-                          <div>
-                            <h4 className="font-bold text-stone-100 text-sm">{imb.nome}</h4>
-                            <p className="text-xs text-stone-400">{imb.cidade} • CRECI: {imb.creci || "N/D"}</p>
-                            <p className="text-[11px] text-amber-500 mt-0.5 truncate max-w-xs">{imb.descricao}</p>
-                          </div>
+                          <h4 className="font-bold text-slate-900 text-sm mt-1 line-clamp-1">{imv.titulo}</h4>
+                          <p className="text-xs text-slate-500">
+                            📍 {imv.bairro}, {imv.cidade} • <strong className="text-slate-800">R$ {Number(imv.preco).toLocaleString('pt-BR')}</strong>
+                          </p>
+                          {corr && (
+                            <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
+                              Corretor: {corr.nome}
+                            </p>
+                          )}
                         </div>
-                        <button onClick={() => excluirImobiliaria(imb.id)} className="bg-rose-950/60 hover:bg-rose-900 text-rose-300 px-3 py-1.5 rounded-xl text-xs font-bold border border-rose-800 transition shrink-0 ml-2">
+                      </div>
+                      <div className="flex items-center space-x-2 self-end sm:self-center shrink-0">
+                        <button
+                          onClick={() => handleExcluirImovel(imv.id)}
+                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition border border-rose-200"
+                        >
                           Excluir
                         </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
-
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
