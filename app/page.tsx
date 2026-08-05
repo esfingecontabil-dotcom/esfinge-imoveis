@@ -262,7 +262,7 @@ export default function Home() {
         </header>
 
         {/* CONTEÚDO PRINCIPAL */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8 pb-16">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-12 pb-16">
           {/* PAINEL DE FILTROS */}
           <div className="bg-neutral-900/90 p-6 sm:p-8 rounded-3xl border border-amber-600/30 shadow-2xl space-y-5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-600/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -446,10 +446,68 @@ export default function Home() {
               })}
             </div>
           )}
+
+          {/* ÁREA DE PARCEIROS IMOBILIÁRIOS */}
+          <section className="bg-gradient-to-r from-neutral-900 via-black to-neutral-900 border border-amber-600/40 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-600/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+              <div className="lg:col-span-2 space-y-4">
+                <div className="inline-flex items-center space-x-2 bg-amber-950/80 border border-amber-600/40 px-3 py-1 rounded-full text-amber-400 text-xs font-black uppercase tracking-wider">
+                  <span>🤝 Espaço Parceiros Esfinge</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black text-white font-serif leading-tight">
+                  É Corretor ou Imobiliária? <br className="hidden sm:inline"/>
+                  <span className="text-amber-500">Anuncie seus imóveis sob a nossa guarda.</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-2xl">
+                  Oferecemos uma plataforma tecnológica de ponta para divulgação dos seus anúncios. Conecte sua carteira de imóveis diretamente a clientes interessados e receba contatos direto no seu WhatsApp, sem intermediários.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                  <div className="bg-black/60 border border-amber-600/20 p-3.5 rounded-2xl">
+                    <span className="text-amber-500 font-black text-base block mb-1">🚀 Alta Visibilidade</span>
+                    <span className="text-[11px] text-neutral-400">Exposição para clientes de Maringá e Litoral.</span>
+                  </div>
+                  <div className="bg-black/60 border border-amber-600/20 p-3.5 rounded-2xl">
+                    <span className="text-amber-500 font-black text-base block mb-1">⚡ Importador por Link</span>
+                    <span className="text-[11px] text-neutral-400">Cadastre imóveis em segundos colando a URL.</span>
+                  </div>
+                  <div className="bg-black/60 border border-amber-600/20 p-3.5 rounded-2xl">
+                    <span className="text-amber-500 font-black text-base block mb-1">📱 Lead no Seu Zap</span>
+                    <span className="text-[11px] text-neutral-400">O comprador entra em contato direto com você.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-black border border-amber-600/40 p-6 rounded-2xl text-center space-y-4 shadow-xl">
+                <h3 className="font-extrabold text-amber-400 text-lg">Quero Anunciar Meu Portfólio</h3>
+                <p className="text-xs text-neutral-400">
+                  Acesse nosso Portal do Corretor ou fale diretamente com a equipe da Esfinge para parcerias.
+                </p>
+                <div className="space-y-2.5 pt-2">
+                  <a
+                    href="/admin"
+                    className="block w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-3 rounded-xl text-xs transition shadow-lg uppercase tracking-wider"
+                  >
+                    👨‍💼 Acessar Painel do Corretor
+                  </a>
+                  <a
+                    href="https://wa.me/5544997278694?text=Olá!%20Sou%20corretor/imobiliária%20e%20gostaria%20de%20anunciar%20meus%20imóveis%20na%20Esfinge."
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block w-full bg-neutral-900 border border-amber-600/40 hover:bg-neutral-800 text-amber-400 font-bold py-3 rounded-xl text-xs transition"
+                  >
+                    💬 Falar sobre Parcerias no WhatsApp
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
         </main>
       </div>
 
-      {/* RODAPÉ NOVO COM DADOS DA EMPRESA E DISCLAIMER LEGAL DE CORRETAGEM */}
+      {/* RODAPÉ COM DADOS DA EMPRESA E DISCLAIMER LEGAL */}
       <footer className="bg-black text-neutral-300 border-t border-amber-600/40 pt-16 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -461,7 +519,6 @@ export default function Home() {
                 <span className="font-black text-xl text-amber-500 tracking-wider font-serif">ESFINGE IMÓVEIS</span>
               </div>
               
-              {/* DADOS DA EMPRESA SOLICITADOS */}
               <div className="text-xs text-amber-200/90 space-y-1 font-mono bg-neutral-900/90 p-4 rounded-2xl border border-amber-600/30 max-w-md">
                 <p className="font-bold text-amber-400">VIP ARTE - & ESTRATEGIAS LTDA</p>
                 <p>CNPJ: 12.225.613/0001-06</p>
@@ -487,7 +544,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* AVISO LEGAL SOLICITADO */}
           <div className="p-5 rounded-2xl bg-neutral-900/80 border border-amber-600/20 text-xs text-neutral-400 leading-relaxed space-y-2">
             <p className="font-bold text-amber-500 uppercase tracking-wider text-[11px]">📜 Termo de Isenção e Uso da Plataforma</p>
             <p>
