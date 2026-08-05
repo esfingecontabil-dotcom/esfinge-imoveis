@@ -1,17 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
-const defaultUrl = "https://oohtiefgaelsmvgvtezd.supabase.co";
-const defaultKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder";
+// Fallback ultra-seguro para garantir que nunca seja passado uma URL vazia ou inválida
+const FALLBACK_URL = "https://oohtiefgaelsmvgvtezd.supabase.co";
+const FALLBACK_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder";
 
-const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || defaultUrl;
-const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || defaultKey;
+const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Remove eventuais aspas e espaços extras das variáveis de ambiente
-const supabaseUrl = rawUrl.replace(/^["']|["']$/g, "").trim();
-const supabaseAnonKey = rawKey.replace(/^["']|["']$/g, "").trim();
+// Validação estrita para aceitar apenas URLs HTTP/HTTPS válidas
+const supabaseUrl = (rawUrl && typeof rawUrl === "string" && rawUrl.trim().startsWith("http"))
+  ? rawUrl.replace(/^["']|["']$/g, "").trim()
+  : FALLBACK_URL;
 
-// Garante que a URL seja válida antes de chamar o createClient
-const finalUrl = supabaseUrl.startsWith("http") ? supabaseUrl : defaultUrl;
-const finalKey = supabaseAnonKey.length > 0 ? supabaseAnonKey : defaultKey;
+const supabaseAnonKey = (rawKey && typeof rawKey === "string" && rawKey.trim().length > 5)
+  ? rawKey.replace(/^["']|["']$/g, "").trim()
+  : FALLBACK_KEY;
 
-export const supabase = createClient(finalUrl, finalKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
