@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import BannerPosicionamento from "@/components/BannerPosicionamento";
 
 export const dynamic = "force-dynamic";
 
@@ -333,6 +334,9 @@ export default function Home() {
               </div>
             </div>
           </div>
+
+          {/* BANNER DE POSICIONAMENTO ESTRATÉGICO */}
+          <BannerPosicionamento />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2">
             <div>
