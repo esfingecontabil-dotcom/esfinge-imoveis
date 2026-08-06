@@ -81,28 +81,56 @@ export default function AdminPage() {
     setLoginError("");
 
     try {
+      // 1. Busca o corretor no Supabase pelo E-mail ou CRECI
       const { data, error } = await supabase
         .from("corretores")
         .select("*")
         .or(`email.eq.${inputEmail},creci.eq.${inputEmail}`);
 
-      if (error || !data || data.length === 0) {
-        setLoginError("E-mail ou CRECI não encontrado.");
-        setLoadingLogin(false);
-        return;
+      // Se encontrou o usuário no banco
+      if (data && data.length > 0) {
+        const corretor = data[0];
+        const senhaCorreta = corretor.senha || "esfinge2026";
+
+        if (inputPassword === senhaCorreta || inputPassword === "esfinge2026") {
+          setIsAuthenticated(true);
+          setCorretorLogado(corretor);
+          return;
+        } else {
+          setLoginError("Senha incorreta. Tente novamente.");
+          return;
+        }
       }
 
-      const corretor = data[0];
-      const senhaCorreta = corretor.senha || "esfinge2026";
+      // 2. SE NÃO ENCONTROU, mas você usou a senha mestre esfinge2026:
+      if (inputPassword === "esfinge2026") {
+        const novoMestre = {
+          nome: "Administrador Esfinge",
+          creci: inputEmail.toUpperCase().includes("PR") ? inputEmail : "PR-45920",
+          telefone: "44997278694",
+          email: inputEmail.includes("@") ? inputEmail : "admin@esfingeimoveis.com.br",
+          senha: "esfinge2026"
+        };
 
-      if (inputPassword === senhaCorreta || inputPassword === "esfinge2026") {
+        // Cria o usuário automaticamente no Supabase
+        const { data: inserted } = await supabase
+          .from("corretores")
+          .insert([novoMestre])
+          .select();
+
         setIsAuthenticated(true);
-        setCorretorLogado(corretor);
+        setCorretorLogado(inserted && inserted[0] ? inserted[0] : novoMestre);
       } else {
-        setLoginError("Senha incorreta. Tente novamente.");
+        setLoginError("E-mail ou CRECI não encontrado. Use a senha esfinge2026 para primeiro acesso.");
       }
     } catch (err) {
-      setLoginError("Erro ao validar login. Verifique sua conexão.");
+      // Entrada de emergência se houver falha na rede do Supabase
+      if (inputPassword === "esfinge2026") {
+        setIsAuthenticated(true);
+        setCorretorLogado({ nome: "Administrador Esfinge", creci: "PR-45920", telefone: "44997278694" });
+      } else {
+        setLoginError("Erro ao validar login. Verifique sua conexão.");
+      }
     } finally {
       setLoadingLogin(false);
     }
