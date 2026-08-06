@@ -9,11 +9,25 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [corretorLogado, setCorretorLogado] = useState(null);
   
+  // Modos de Tela Inicial: "login" ou "registro"
+  const [modoAcesso, setModoAcesso] = useState("login");
+
+  // Estado do Login
   const [inputEmail, setInputEmail] = useState("");
   const [inputPassword, setInputPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loadingLogin, setLoadingLogin] = useState(false);
 
+  // Estado do Cadastro Público de Corretor
+  const [regNome, setRegNome] = useState("");
+  const [regCreci, setRegCreci] = useState("");
+  const [regTelefone, setRegTelefone] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regSenha, setRegSenha] = useState("");
+  const [regError, setRegError] = useState("");
+  const [loadingRegister, setLoadingRegister] = useState(false);
+
+  // Dados do Banco
   const [corretores, setCorretores] = useState([]);
   const [imoveis, setImoveis] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +51,7 @@ export default function AdminPage() {
     imagemUrl: ""
   });
 
-  // Form de Corretor
+  // Form Interno de Corretor
   const [formCorretor, setFormCorretor] = useState({
     nome: "",
     creci: "",
@@ -75,24 +89,27 @@ export default function AdminPage() {
     }
   }
 
+  // LOGIN
   async function handleLogin(e) {
     e.preventDefault();
     setLoadingLogin(true);
     setLoginError("");
 
+    const emailLimpo = inputEmail.trim();
+    const senhaLimpa = inputPassword.trim();
+
     try {
-      // 1. Busca o corretor no Supabase pelo E-mail ou CRECI
+      // 1. Tenta buscar no Supabase pelo E-mail ou CRECI
       const { data, error } = await supabase
         .from("corretores")
         .select("*")
-        .or(`email.eq.${inputEmail},creci.eq.${inputEmail}`);
+        .or(`email.eq.${emailLimpo},creci.eq.${emailLimpo}`);
 
-      // Se encontrou o usuário no banco
       if (data && data.length > 0) {
         const corretor = data[0];
-        const senhaCorreta = corretor.senha || "esfinge2026";
+        const senhaCorreta = corretor.senha || "Emer@1978";
 
-        if (inputPassword === senhaCorreta || inputPassword === "esfinge2026") {
+        if (senhaLimpa === senhaCorreta || senhaLimpa === "Emer@1978") {
           setIsAuthenticated(true);
           setCorretorLogado(corretor);
           return;
@@ -102,37 +119,76 @@ export default function AdminPage() {
         }
       }
 
-      // 2. SE NÃO ENCONTROU, mas você usou a senha mestre esfinge2026:
-      if (inputPassword === "esfinge2026") {
-        const novoMestre = {
+      // 2. CREDENCIAIS MESTRE DO ADMINISTRADOR
+      if ((emailLimpo === "esfinge.contabil@gmail.com" || emailLimpo === "PR-057004") && senhaLimpa === "Emer@1978") {
+        const adminMestre = {
           nome: "Administrador Esfinge",
-          creci: inputEmail.toUpperCase().includes("PR") ? inputEmail : "PR-45920",
+          creci: "PR-057004",
           telefone: "44997278694",
-          email: inputEmail.includes("@") ? inputEmail : "admin@esfingeimoveis.com.br",
-          senha: "esfinge2026"
+          email: "esfinge.contabil@gmail.com",
+          senha: "Emer@1978"
         };
 
-        // Cria o usuário automaticamente no Supabase
         const { data: inserted } = await supabase
           .from("corretores")
-          .insert([novoMestre])
+          .insert([adminMestre])
           .select();
 
         setIsAuthenticated(true);
-        setCorretorLogado(inserted && inserted[0] ? inserted[0] : novoMestre);
+        setCorretorLogado(inserted && inserted[0] ? inserted[0] : adminMestre);
       } else {
-        setLoginError("E-mail ou CRECI não encontrado. Use a senha esfinge2026 para primeiro acesso.");
+        setLoginError("E-mail ou CRECI não encontrado.");
       }
     } catch (err) {
-      // Entrada de emergência se houver falha na rede do Supabase
-      if (inputPassword === "esfinge2026") {
+      if ((emailLimpo === "esfinge.contabil@gmail.com" || emailLimpo === "PR-057004") && senhaLimpa === "Emer@1978") {
         setIsAuthenticated(true);
-        setCorretorLogado({ nome: "Administrador Esfinge", creci: "PR-45920", telefone: "44997278694" });
+        setCorretorLogado({ nome: "Administrador Esfinge", creci: "PR-057004", telefone: "44997278694" });
       } else {
         setLoginError("Erro ao validar login. Verifique sua conexão.");
       }
     } finally {
       setLoadingLogin(false);
+    }
+  }
+
+  // CADASTRO PÚBLICO DE CORRETOR
+  async function handlePublicRegister(e) {
+    e.preventDefault();
+    setLoadingRegister(true);
+    setRegError("");
+
+    if (!regNome || !regCreci || !regTelefone || !regEmail || !regSenha) {
+      setRegError("Por favor, preencha todos os campos obrigatórios.");
+      setLoadingRegister(false);
+      return;
+    }
+
+    try {
+      const novoCorretor = {
+        nome: regNome.trim(),
+        creci: regCreci.trim().toUpperCase(),
+        telefone: regTelefone.trim(),
+        email: regEmail.trim().toLowerCase(),
+        senha: regSenha.trim()
+      };
+
+      const { data, error } = await supabase
+        .from("corretores")
+        .insert([novoCorretor])
+        .select();
+
+      if (error) {
+        setRegError("Erro ao criar cadastro: " + error.message);
+      } else {
+        const cad = data && data[0] ? data[0] : novoCorretor;
+        setIsAuthenticated(true);
+        setCorretorLogado(cad);
+        fetchDados();
+      }
+    } catch (err) {
+      setRegError("Erro de conexão ao cadastrar. Tente novamente.");
+    } finally {
+      setLoadingRegister(false);
     }
   }
 
@@ -249,11 +305,12 @@ export default function AdminPage() {
     }
   }
 
-  // TELA DE LOGIN
+  // TELA INICIAL (LOGIN / CADASTRO PÚBLICO)
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-sans">
         <div className="bg-white p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6">
+          
           <div className="text-center">
             <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center mx-auto text-xl mb-3 font-bold shadow-md">
               🏰
@@ -266,43 +323,128 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">E-MAIL OU CRECI</label>
-              <input
-                type="text"
-                placeholder="Ex: carlos@esfingeimoveis.com.br ou PR-45920"
-                value={inputEmail}
-                onChange={(e) => setInputEmail(e.target.value)}
-                required
-                className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">SENHA DE ACESSO</label>
-              <input
-                type="password"
-                placeholder="Sua senha..."
-                value={inputPassword}
-                onChange={(e) => setInputPassword(e.target.value)}
-                required
-                className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-sm"
-              />
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                Admin padrão: E-mail cadastrado ou senha <strong>esfinge2026</strong>
-              </span>
-            </div>
-            {loginError && <p className="text-xs font-bold text-rose-500">{loginError}</p>}
+          {/* SELETOR DE ABAS: ENTRAR x CADASTRO */}
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
             <button
-              type="submit"
-              disabled={loadingLogin}
-              className="w-full bg-slate-900 text-white p-3 rounded-xl font-bold hover:bg-slate-800 transition text-sm shadow"
+              onClick={() => { setModoAcesso("login"); setLoginError(""); }}
+              className={`flex-1 py-2.5 rounded-xl transition ${modoAcesso === "login" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900"}`}
             >
-              {loadingLogin ? "Verificando..." : "Entrar no Painel"}
+              Já Tenho Conta
             </button>
-          </form>
+            <button
+              onClick={() => { setModoAcesso("registro"); setRegError(""); }}
+              className={`flex-1 py-2.5 rounded-xl transition ${modoAcesso === "registro" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              Quero me Cadastrar ✨
+            </button>
+          </div>
 
-          <a href="/" className="block text-center text-xs text-slate-500 hover:text-amber-600 underline">
+          {/* ABA 1: LOGIN */}
+          {modoAcesso === "login" ? (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">E-MAIL OU CRECI</label>
+                <input
+                  type="text"
+                  placeholder="Ex: carlos@esfingeimoveis.com.br ou PR-45920"
+                  value={inputEmail}
+                  onChange={(e) => setInputEmail(e.target.value)}
+                  required
+                  className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">SENHA DE ACESSO</label>
+                <input
+                  type="password"
+                  placeholder="Sua senha..."
+                  value={inputPassword}
+                  onChange={(e) => setInputPassword(e.target.value)}
+                  required
+                  className="w-full p-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-sm"
+                />
+              </div>
+              {loginError && <p className="text-xs font-bold text-rose-500">{loginError}</p>}
+              <button
+                type="submit"
+                disabled={loadingLogin}
+                className="w-full bg-slate-900 text-white p-3.5 rounded-xl font-bold hover:bg-slate-800 transition text-sm shadow"
+              >
+                {loadingLogin ? "Verificando..." : "Entrar no Painel"}
+              </button>
+            </form>
+          ) : (
+            /* ABA 2: CADASTRO SELF-SERVICE DE CORRETOR */
+            <form onSubmit={handlePublicRegister} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">NOME COMPLETO *</label>
+                <input
+                  type="text"
+                  placeholder="Ex: João da Silva"
+                  value={regNome}
+                  onChange={(e) => setRegNome(e.target.value)}
+                  required
+                  className="w-full p-2.5 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-xs"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">CRECI *</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: PR-12345"
+                    value={regCreci}
+                    onChange={(e) => setRegCreci(e.target.value)}
+                    required
+                    className="w-full p-2.5 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">WHATSAPP *</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 41999998888"
+                    value={regTelefone}
+                    onChange={(e) => setRegTelefone(e.target.value)}
+                    required
+                    className="w-full p-2.5 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-xs"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">E-MAIL COMERCIAL *</label>
+                <input
+                  type="email"
+                  placeholder="seuemail@imobiliaria.com.br"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  required
+                  className="w-full p-2.5 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">CRIE UMA SENHA *</label>
+                <input
+                  type="password"
+                  placeholder="Crie sua senha de acesso"
+                  value={regSenha}
+                  onChange={(e) => setRegSenha(e.target.value)}
+                  required
+                  className="w-full p-2.5 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:border-amber-500 text-xs"
+                />
+              </div>
+              {regError && <p className="text-xs font-bold text-rose-500">{regError}</p>}
+              <button
+                type="submit"
+                disabled={loadingRegister}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 p-3.5 rounded-xl font-black transition text-xs shadow mt-1"
+              >
+                {loadingRegister ? "Criando Conta..." : "Criar Minha Conta e Entrar 🚀"}
+              </button>
+            </form>
+          )}
+
+          <a href="/" className="block text-center text-xs text-slate-500 hover:text-amber-600 underline pt-2">
             ← Voltar para a Vitrine Pública
           </a>
         </div>
@@ -344,7 +486,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* 🛡️ PARTE 1: BANNER DE POSICIONAMENTO E GARANTIA DE LEAD DIRETO */}
+        {/* 🛡️ BANNER DE POSICIONAMENTO E GARANTIA DE LEAD DIRETO */}
         <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 text-white p-6 rounded-3xl border border-amber-500/30 shadow-xl flex items-start gap-4">
           <div className="text-3xl shrink-0">🛡️</div>
           <div className="space-y-1">
@@ -357,7 +499,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* ⚡ PARTE 2: IMPORTADOR INTELIGENTE POR LINK */}
+        {/* ⚡ IMPORTADOR INTELIGENTE POR LINK */}
         <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl space-y-3 border border-slate-800">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="font-extrabold text-sm text-amber-400 flex items-center gap-2">
@@ -574,9 +716,9 @@ export default function AdminPage() {
               </form>
             </div>
 
-            {/* CADASTRO DE CORRETOR */}
+            {/* CADASTRO INTERNO DE OUTROS CORRETORES */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-              <h3 className="font-black text-slate-900 text-base border-b pb-3">Novo Corretor</h3>
+              <h3 className="font-black text-slate-900 text-base border-b pb-3">Adicionar Corretor à Equipe</h3>
               <form onSubmit={handleCadastrarCorretor} className="space-y-3">
                 <input
                   type="text"
