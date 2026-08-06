@@ -212,7 +212,7 @@ export default function AdminPage() {
           preco: data.preco ? String(data.preco) : prev.preco,
           imagemUrl: data.imagem || prev.imagemUrl
         }));
-        alert("Dados importados com sucesso! Revise e clique em Cadastrar.");
+        alert("Dados importados com sucesso! Revise as informações abaixo e clique em Publicar Imóvel.");
       }
     } catch (err) {
       alert("Erro de conexão ao importar link.");
@@ -221,17 +221,23 @@ export default function AdminPage() {
     }
   }
 
+  // TELA DE LOGIN
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-sans">
         <div className="bg-white p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6">
           <div className="text-center">
             <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center mx-auto text-xl mb-3 font-bold shadow-md">
-              🔒
+              🏰
             </div>
             <h2 className="text-xl font-black text-slate-900">Portal do Corretor</h2>
             <p className="text-xs text-slate-500 mt-1">Esfinge | Guardião de Imóveis</p>
+
+            <div className="mt-3 inline-block bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold px-3 py-1 rounded-full">
+              ⚡ Zero Comissão • Lead Direto no Seu Zap
+            </div>
           </div>
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">E-MAIL OU CRECI</label>
@@ -267,6 +273,7 @@ export default function AdminPage() {
               {loadingLogin ? "Verificando..." : "Entrar no Painel"}
             </button>
           </form>
+
           <a href="/" className="block text-center text-xs text-slate-500 hover:text-amber-600 underline">
             ← Voltar para a Vitrine Pública
           </a>
@@ -275,16 +282,23 @@ export default function AdminPage() {
     );
   }
 
+  // TELA AUTENTICADA (PAINEL DO CORRETOR)
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 p-4 md:p-8 font-sans pb-20">
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* TOPO DO PAINEL */}
         <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex-wrap gap-4">
           <div>
-            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+            <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
               Painel Administrativo • Olá, {corretorLogado?.nome || "Corretor"}
             </span>
-            <h1 className="text-2xl font-black text-slate-900 mt-1">Esfinge | Gestão de Imóveis</h1>
-            <p className="text-xs text-slate-500">Cadastre imóveis, importe por link e gerencie corretores</p>
+            <h1 className="text-2xl font-black text-slate-900 mt-1.5 font-serif">
+              Esfinge | Gestão de Imóveis
+            </h1>
+            <p className="text-xs text-slate-500">
+              Cadastre imóveis, importe por link e gerencie sua carteira
+            </p>
           </div>
           <div className="flex items-center space-x-3">
             <button
@@ -302,33 +316,58 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-3xl shadow-lg space-y-3">
-          <h3 className="font-extrabold text-sm flex items-center gap-2">
-            <span>⚡ Importador Inteligente de Imóvel por Link</span>
-          </h3>
+        {/* 🛡️ PARTE 1: BANNER DE POSICIONAMENTO E GARANTIA DE LEAD DIRETO */}
+        <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 text-white p-6 rounded-3xl border border-amber-500/30 shadow-xl flex items-start gap-4">
+          <div className="text-3xl shrink-0">🛡️</div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-extrabold text-amber-400 uppercase tracking-wide">
+              Garantia Esfinge: 100% dos Leads Ficam com a Sua Imobiliária
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+              <strong className="text-white">Nós não somos uma imobiliária disputando o seu cliente.</strong> O Portal Esfinge é a vitrine tecnológica do Paraná criada para conectar o comprador diretamente ao seu WhatsApp, sem comissões ou intermediários.
+            </p>
+          </div>
+        </div>
+
+        {/* ⚡ PARTE 2: IMPORTADOR INTELIGENTE POR LINK */}
+        <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl space-y-3 border border-slate-800">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="font-extrabold text-sm text-amber-400 flex items-center gap-2">
+              <span>⚡ Importador Inteligente de Imóvel por Link</span>
+            </h3>
+            <span className="text-[10px] bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md font-mono">
+              Economize tempo no cadastro
+            </span>
+          </div>
           <p className="text-xs text-slate-300">
-            Cole o link de um anúncio imobiliário para preencher automaticamente os dados abaixo:
+            Cole a URL do seu anúncio (do seu site ou portal) para extrair o título, preço e fotos automaticamente para o formulário:
           </p>
           <form onSubmit={handleImportarLink} className="flex gap-2 flex-col sm:flex-row">
             <input
               type="url"
-              placeholder="https://exemplo.com.br/imovel/123"
+              placeholder="https://suaimobiliaria.com.br/imovel/sobrado-centro..."
               value={importUrl}
               onChange={(e) => setImportUrl(e.target.value)}
-              className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-amber-500"
+              required
+              className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white outline-none focus:border-amber-500 placeholder-slate-500 font-medium"
             />
             <button
               type="submit"
               disabled={importing}
-              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-xl text-xs transition whitespace-nowrap shadow"
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-3 rounded-xl text-xs transition whitespace-nowrap shadow shrink-0 disabled:opacity-50"
             >
-              {importing ? "Importando..." : "Importar Dados"}
+              {importing ? "Extraindo Dados..." : "Importar Dados 🚀"}
             </button>
           </form>
         </div>
 
+        {/* FORMULÁRIOS E LISTAGEM */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* COLUNA DA ESQUERDA: CADASTROS */}
           <div className="space-y-6">
+            
+            {/* CADASTRO DE IMÓVEL */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
               <h3 className="font-black text-slate-900 text-base border-b pb-3">Cadastrar Novo Imóvel</h3>
               <form onSubmit={handleCadastrarImovel} className="space-y-3.5">
@@ -339,7 +378,7 @@ export default function AdminPage() {
                     value={formImovel.codigo}
                     onChange={(e) => setFormImovel({ ...formImovel, codigo: e.target.value })}
                     required
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-500 font-mono font-bold"
                   />
                 </div>
                 <div>
@@ -396,7 +435,7 @@ export default function AdminPage() {
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">BAIRRO / REGIÃO</label>
                     <input
                       type="text"
-                      placeholder="Ex: Zona 03"
+                      placeholder="Ex: Praia de Leste / Zona 03"
                       value={formImovel.bairro}
                       onChange={(e) => setFormImovel({ ...formImovel, bairro: e.target.value })}
                       required
@@ -500,13 +539,14 @@ export default function AdminPage() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black p-3 rounded-xl text-xs transition shadow-md mt-2"
+                  className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black p-3 rounded-xl text-xs transition shadow-md mt-2"
                 >
                   Publicar Imóvel na Vitrine
                 </button>
               </form>
             </div>
 
+            {/* CADASTRO DE CORRETOR */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
               <h3 className="font-black text-slate-900 text-base border-b pb-3">Novo Corretor</h3>
               <form onSubmit={handleCadastrarCorretor} className="space-y-3">
@@ -549,6 +589,7 @@ export default function AdminPage() {
                   Cadastrar Corretor
                 </button>
               </form>
+
               <div className="pt-3 border-t space-y-2">
                 <h4 className="font-bold text-[11px] text-slate-400 uppercase">Equipe Registrada</h4>
                 {corretores.map((c) => (
@@ -564,6 +605,7 @@ export default function AdminPage() {
             </div>
           </div>
 
+          {/* COLUNA DA DIREITA: LISTAGEM DOS IMÓVEIS */}
           <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-black text-slate-900 text-base">
@@ -633,6 +675,7 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+
         </div>
       </div>
     </div>
