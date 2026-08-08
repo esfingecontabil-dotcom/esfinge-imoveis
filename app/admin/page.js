@@ -100,7 +100,7 @@ export default function AdminPage() {
 
     try {
       // 1. Tenta buscar no Supabase pelo E-mail ou CRECI
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("corretores")
         .select("*")
         .or(`email.eq.${emailLimpo},creci.eq.${emailLimpo}`);
@@ -215,7 +215,9 @@ export default function AdminPage() {
       ar_condicionado: formImovel.arCondicionado,
       imagens: formImovel.imagemUrl ? [formImovel.imagemUrl] : ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"],
       corretor_id: Number(formImovel.corretorId || corretorLogado?.id || 1),
-      status: "Disponível"
+      status: "Disponível",
+      visualizacoes: 0,
+      cliques_whatsapp: 0
     };
 
     const { error } = await supabase.from("imoveis").insert([novoImovel]);
@@ -323,7 +325,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* SELETOR DE ABAS: ENTRAR x CADASTRO */}
+          {/* SELETOR DE ABAS */}
           <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
             <button
               onClick={() => { setModoAcesso("login"); setLoginError(""); }}
@@ -467,7 +469,7 @@ export default function AdminPage() {
               Esfinge | Gestão de Imóveis
             </h1>
             <p className="text-xs text-slate-500">
-              Cadastre imóveis, importe por link e gerencie sua carteira
+              Cadastre imóveis, importe por link e acompanhe o desempenho da sua carteira
             </p>
           </div>
           <div className="flex items-center space-x-3">
@@ -716,7 +718,7 @@ export default function AdminPage() {
               </form>
             </div>
 
-            {/* CADASTRO INTERNO DE OUTROS CORRETORES */}
+            {/* CADASTRO INTERNO DE CORRETORES */}
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
               <h3 className="font-black text-slate-900 text-base border-b pb-3">Adicionar Corretor à Equipe</h3>
               <form onSubmit={handleCadastrarCorretor} className="space-y-3">
@@ -829,6 +831,17 @@ export default function AdminPage() {
                               Corretor: {corr.nome}
                             </p>
                           )}
+
+                          {/* 📊 EXIBIÇÃO DAS MÉTRICAS DOS IMÓVEIS */}
+                          <div className="flex items-center gap-2 text-[10px] font-bold mt-1.5 flex-wrap">
+                            <span className="bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded border border-slate-300">
+                              👁️ {imv.visualizacoes || 0} visualizações
+                            </span>
+                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                              💬 {imv.cliques_whatsapp || 0} cliques no Zap
+                            </span>
+                          </div>
+
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 self-end sm:self-center shrink-0">
