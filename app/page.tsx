@@ -30,84 +30,6 @@ export interface Imovel {
   destaque?: boolean;
 }
 
-const IMOVEIS_INICIAIS: Imovel[] = [
-  {
-    id: 1,
-    codigo: "ESF-101",
-    titulo: "Sobrado Moderno em Condomínio Fechado",
-    tipo: "Sobrado",
-    cidade: "Maringá",
-    bairro: "Zona 03",
-    modalidade: "Venda",
-    preco: 980000,
-    quartos: 3,
-    banheiros: 3,
-    vagas: 2,
-    areaUtil: 210,
-    aceitaPet: true,
-    arCondicionado: true,
-    imagens: [
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1200&q=80",
-    ],
-    corretor: {
-      nome: "Carlos Eduardo",
-      creci: "PR-45920",
-      telefone: "44997278694",
-    },
-    destaque: true,
-  },
-  {
-    id: 2,
-    codigo: "ESF-102",
-    titulo: "Apartamento Alto Padrão Frente para o Mar",
-    tipo: "Apartamento",
-    cidade: "Pontal do Paraná",
-    bairro: "Praia de Leste",
-    modalidade: "Venda",
-    preco: 1250000,
-    quartos: 4,
-    banheiros: 4,
-    vagas: 3,
-    areaUtil: 185,
-    aceitaPet: true,
-    arCondicionado: true,
-    imagens: [
-      "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80",
-    ],
-    corretor: {
-      nome: "Juliana Silva",
-      creci: "PR-38190",
-      telefone: "44997278694",
-    },
-    destaque: true,
-  },
-  {
-    id: 3,
-    codigo: "ESF-103",
-    titulo: "Studio Compacto & Mobiliado no Centro",
-    tipo: "Studio",
-    cidade: "Maringá",
-    bairro: "Centro",
-    modalidade: "Aluguel",
-    preco: 2200,
-    quartos: 1,
-    banheiros: 1,
-    vagas: 1,
-    areaUtil: 45,
-    aceitaPet: false,
-    arCondicionado: true,
-    imagens: [
-      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80",
-    ],
-    corretor: {
-      nome: "Carlos Eduardo",
-      creci: "PR-45920",
-      telefone: "44997278694",
-    },
-  },
-];
-
 const CATEGORIAS = [
   { id: "Todos", label: "Todos", icon: "✨" },
   { id: "Casa", label: "Casas", icon: "🏠" },
@@ -118,7 +40,7 @@ const CATEGORIAS = [
 ];
 
 export default function Home() {
-  const [imoveis, setImoveis] = useState<Imovel[]>(IMOVEIS_INICIAIS);
+  const [imoveis, setImoveis] = useState<Imovel[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [buscaTexto, setBuscaTexto] = useState("");
@@ -135,41 +57,65 @@ export default function Home() {
   useEffect(() => {
     async function carregarImoveisPublicos() {
       try {
-        const { data, error } = await supabase.from("imoveis").select("*");
-        if (!error && data && data.length > 0) {
-          const formatados: Imovel[] = data.map((item: any) => ({
-            id: item.id,
-            codigo: item.codigo || "ESF-000",
-            titulo: item.titulo || "Imóvel Esfinge",
-            tipo: item.tipo || "Casa",
-            cidade: item.cidade || "Maringá",
-            bairro: item.bairro || "Centro",
-            modalidade: item.modalidade || "Venda",
-            preco: Number(item.preco) || 500000,
-            quartos: Number(item.quartos) || 3,
-            banheiros: Number(item.banheiros) || 2,
-            vagas: Number(item.vagas) || 2,
-            areaUtil: Number(item.area_util) || 120,
-            aceitaPet: item.aceita_pet ?? true,
-            arCondicionado: item.ar_condicionado ?? true,
-            imagens: item.imagens && item.imagens.length > 0 ? item.imagens : ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"],
-            corretor: {
-              nome: "Carlos Eduardo",
-              creci: "PR-45920",
-              telefone: "44997278694",
-            },
-            destaque: item.destaque || false,
-          }));
+        const { data, error } = await supabase
+          .from("imoveis")
+          .select("*")
+          .order("id", { ascending: false });
+
+        if (error) {
+          console.error("Erro ao carregar do Supabase:", error.message);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const formatados: Imovel[] = data.map((item: any) => {
+            const fotos = Array.isArray(item.imagens) && item.imagens.length > 0
+              ? item.imagens
+              : item.imagem_url
+              ? [item.imagem_url]
+              : ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"];
+
+            return {
+              id: item.id,
+              codigo: item.codigo || `ESF-${item.id}`,
+              titulo: item.titulo || "Imóvel Esfinge",
+              tipo: item.tipo || "Casa",
+              cidade: item.cidade || "Matinhos",
+              bairro: item.bairro || item.bairro_balneario || "Centro",
+              modalidade: item.modalidade || "Venda",
+              preco: Number(item.preco) || 0,
+              quartos: Number(item.quartos) || 0,
+              banheiros: Number(item.banheiros) || 0,
+              vagas: Number(item.vagas) || 0,
+              areaUtil: Number(item.area_m2) || Number(item.area_util) || Number(item.area) || 0,
+              aceitaPet: item.aceita_pet ?? true,
+              arCondicionado: item.com_ar_condicionado ?? item.ar_condicionado ?? true,
+              imagens: fotos,
+              corretor: {
+                nome: "Atendimento Esfinge",
+                creci: "PR-45920",
+                telefone: "44997278694",
+              },
+              destaque: item.destaque || false,
+            };
+          });
+
           setImoveis(formatados);
         }
       } catch (err) {
-        console.error("Usando dados locais de fallback", err);
+        console.error("Erro inesperado ao buscar imóveis:", err);
       } finally {
         setLoading(false);
       }
     }
+
     carregarImoveisPublicos();
   }, []);
+
+  const cidadesDisponiveis = useMemo(() => {
+    const lista = Array.from(new Set(imoveis.map((imv) => imv.cidade))).filter(Boolean);
+    return ["Todas", ...lista];
+  }, [imoveis]);
 
   const toggleFavorito = (id: number | string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -189,13 +135,19 @@ export default function Home() {
         if (!matchTitulo && !matchBairro && !matchCidade && !matchCodigo) return false;
       }
 
-      if (categoriaSelecionada !== "Todos" && imovel.tipo !== categoriaSelecionada) {
+      if (categoriaSelecionada !== "Todos" && imovel.tipo.toLowerCase() !== categoriaSelecionada.toLowerCase()) {
         return false;
       }
 
-      if (modalidade !== "Todos" && imovel.modalidade !== modalidade) return false;
-      if (cidade !== "Todas" && imovel.cidade !== cidade) return false;
-      if (imovel.preco > precoMaximo) return false;
+      if (modalidade !== "Todos" && imovel.modalidade.toLowerCase() !== modalidade.toLowerCase()) {
+        return false;
+      }
+
+      if (cidade !== "Todas" && imovel.cidade.toLowerCase() !== cidade.toLowerCase()) {
+        return false;
+      }
+
+      if (imovel.preco > 0 && imovel.preco > precoMaximo) return false;
       if (apenasPet && !imovel.aceitaPet) return false;
       if (apenasAr && !imovel.arCondicionado) return false;
 
@@ -206,7 +158,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-neutral-950 font-sans text-neutral-100 flex flex-col justify-between selection:bg-amber-600 selection:text-black">
       <div>
-        {/* HEADER VIBRANTE COM ESTILO TÉRRACOTA/GRÉCIA */}
+        {/* HEADER */}
         <header className="sticky top-0 z-40 bg-black/95 backdrop-blur-md border-b border-amber-600/30 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-22 flex items-center justify-between gap-4 py-3">
             <div className="flex items-center space-x-3 shrink-0">
@@ -267,7 +219,7 @@ export default function Home() {
           {/* PAINEL DE FILTROS */}
           <div className="bg-neutral-900/90 p-6 sm:p-8 rounded-3xl border border-amber-600/30 shadow-2xl space-y-5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-600/10 rounded-full blur-2xl pointer-events-none"></div>
-            
+
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="w-full md:w-1/2 relative">
                 <span className="absolute left-4 top-3.5 text-amber-500 font-bold">🔍</span>
@@ -294,9 +246,11 @@ export default function Home() {
                   onChange={(e) => setCidade(e.target.value)}
                   className="p-3.5 bg-black border border-amber-600/30 rounded-2xl text-xs sm:text-sm outline-none focus:border-amber-500 font-extrabold text-amber-400 cursor-pointer shadow-sm"
                 >
-                  <option value="Todas">Todas as Cidades</option>
-                  <option value="Maringá">Maringá</option>
-                  <option value="Pontal do Paraná">Pontal do Paraná</option>
+                  {cidadesDisponiveis.map((c) => (
+                    <option key={c} value={c}>
+                      {c === "Todas" ? "Todas as Cidades" : c}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -324,7 +278,7 @@ export default function Home() {
                 <span className="text-amber-400 font-bold">Até R$ {precoMaximo.toLocaleString("pt-BR")}</span>
                 <input
                   type="range"
-                  min="200000"
+                  min="100000"
                   max="3000000"
                   step="50000"
                   value={precoMaximo}
@@ -335,7 +289,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* BANNER DE POSICIONAMENTO ESTRATÉGICO */}
           <BannerPosicionamento />
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2">
@@ -353,11 +306,15 @@ export default function Home() {
           </div>
 
           {loading ? (
-            <div className="text-center py-24 text-amber-500/60 font-bold text-base">Carregando vitrine de imóveis...</div>
+            <div className="text-center py-24 text-amber-500/60 font-bold text-base">
+              Carregando vitrine de imóveis...
+            </div>
           ) : imoveisFiltrados.length === 0 ? (
             <div className="text-center py-28 bg-neutral-900 rounded-3xl border border-amber-600/30 space-y-4">
               <div className="text-4xl">🏰</div>
-              <p className="text-base font-bold text-amber-200/80">Nenhum imóvel encontrado com esses filtros.</p>
+              <p className="text-base font-bold text-amber-200/80">
+                Nenhum imóvel encontrado com esses filtros.
+              </p>
               <button
                 onClick={() => {
                   setBuscaTexto("");
@@ -385,12 +342,12 @@ export default function Home() {
                   >
                     <div className="relative aspect-[4/3] w-full bg-black overflow-hidden">
                       <img
-                        src={imovel.imagens && imovel.imagens[0] ? imovel.imagens[0] : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"}
+                        src={imovel.imagens[0]}
                         alt={imovel.titulo}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90 group-hover:opacity-100"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent opacity-80 group-hover:opacity-50 transition"></div>
-                      
+
                       <button
                         onClick={(e) => toggleFavorito(imovel.id, e)}
                         className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/80 border border-amber-600/30 backdrop-blur-md flex items-center justify-center text-lg hover:scale-110 transition shadow-lg z-10"
@@ -402,7 +359,13 @@ export default function Home() {
                         <span className="bg-black/90 backdrop-blur-md text-amber-400 border border-amber-600/40 text-[11px] font-black px-3 py-1 rounded-lg uppercase tracking-wider shadow">
                           REF: {imovel.codigo}
                         </span>
-                        <span className={`text-[11px] font-black px-3 py-1 rounded-lg text-black uppercase tracking-wider shadow ${imovel.modalidade === 'Venda' ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-amber-200 to-yellow-300'}`}>
+                        <span
+                          className={`text-[11px] font-black px-3 py-1 rounded-lg text-black uppercase tracking-wider shadow ${
+                            imovel.modalidade === "Venda"
+                              ? "bg-gradient-to-r from-amber-500 to-amber-400"
+                              : "bg-gradient-to-r from-amber-200 to-yellow-300"
+                          }`}
+                        >
                           {imovel.modalidade}
                         </span>
                       </div>
@@ -411,8 +374,12 @@ export default function Home() {
                     <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
                       <div>
                         <div className="flex items-center justify-between text-xs font-bold mb-1.5">
-                          <span className="text-amber-500 font-extrabold">📍 {imovel.bairro}, {imovel.cidade}</span>
-                          <span className="bg-black border border-amber-600/20 px-2.5 py-1 rounded-md text-amber-200/80">{imovel.tipo}</span>
+                          <span className="text-amber-500 font-extrabold">
+                            📍 {imovel.bairro}, {imovel.cidade}
+                          </span>
+                          <span className="bg-black border border-amber-600/20 px-2.5 py-1 rounded-md text-amber-200/80">
+                            {imovel.tipo}
+                          </span>
                         </div>
                         <h3 className="font-black text-amber-100 text-lg line-clamp-1 group-hover:text-amber-400 transition-colors">
                           {imovel.titulo}
@@ -427,7 +394,9 @@ export default function Home() {
 
                       <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
                         <div>
-                          <span className="text-[10px] text-neutral-400 block font-black uppercase tracking-wider">Valor do Imóvel</span>
+                          <span className="text-[10px] text-neutral-400 block font-black uppercase tracking-wider">
+                            Valor do Imóvel
+                          </span>
                           <span className="text-xl font-black text-amber-400">
                             R$ {Number(imovel.preco).toLocaleString("pt-BR")}
                           </span>
@@ -451,17 +420,17 @@ export default function Home() {
             </div>
           )}
 
-          {/* ÁREA DE PARCEIROS IMOBILIÁRIOS */}
+          {/* PARCEIROS */}
           <section className="bg-gradient-to-r from-neutral-900 via-black to-neutral-900 border border-amber-600/40 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-64 h-64 bg-amber-600/10 rounded-full blur-3xl pointer-events-none"></div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
               <div className="lg:col-span-2 space-y-4">
                 <div className="inline-flex items-center space-x-2 bg-amber-950/80 border border-amber-600/40 px-3 py-1 rounded-full text-amber-400 text-xs font-black uppercase tracking-wider">
                   <span>🤝 Espaço Parceiros Esfinge</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black text-white font-serif leading-tight">
-                  É Corretor ou Imobiliária? <br className="hidden sm:inline"/>
+                  É Corretor ou Imobiliária? <br className="hidden sm:inline" />
                   <span className="text-amber-500">Anuncie seus imóveis sob a nossa guarda.</span>
                 </h2>
                 <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-2xl">
@@ -511,7 +480,7 @@ export default function Home() {
         </main>
       </div>
 
-      {/* RODAPÉ COM DADOS DA EMPRESA E DISCLAIMER LEGAL */}
+      {/* FOOTER */}
       <footer className="bg-black text-neutral-300 border-t border-amber-600/40 pt-16 pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -522,7 +491,7 @@ export default function Home() {
                 </div>
                 <span className="font-black text-xl text-amber-500 tracking-wider font-serif">ESFINGE IMÓVEIS</span>
               </div>
-              
+
               <div className="text-xs text-amber-200/90 space-y-1 font-mono bg-neutral-900/90 p-4 rounded-2xl border border-amber-600/30 max-w-md">
                 <p className="font-bold text-amber-400">VIP ARTE - & ESTRATEGIAS LTDA</p>
                 <p>CNPJ: 12.225.613/0001-06</p>
@@ -543,7 +512,7 @@ export default function Home() {
               <h4 className="text-sm font-black text-amber-500 uppercase tracking-wider border-b border-amber-900/40 pb-2">Regiões Atendidas</h4>
               <ul className="space-y-2 text-xs font-medium text-neutral-400">
                 <li>📍 Maringá e Região Metropolitana</li>
-                <li>🌊 Litoral do Paraná (Matinhos, Pontal do Paraná e praias)</li>
+                <li>🌊 Litoral do Paraná (Matinhos, Pontal do Paraná, Guaratuba)</li>
               </ul>
             </div>
           </div>
@@ -551,7 +520,7 @@ export default function Home() {
           <div className="p-5 rounded-2xl bg-neutral-900/80 border border-amber-600/20 text-xs text-neutral-400 leading-relaxed space-y-2">
             <p className="font-bold text-amber-500 uppercase tracking-wider text-[11px]">📜 Termo de Isenção e Uso da Plataforma</p>
             <p>
-              Este site não realiza atividades de corretagem ou intermediação imobiliária. A atividade de corretagem de imóveis é exercida de forma autônoma e exclusiva pelos corretores de imóveis e imobiliárias devidamente registrados nos órgãos competentes (CRECI). O nosso site é estritamente uma ferramenta tecnológica de busca, anúncio e aproximação entre imóveis, imobiliárias, proprietários, compradores e locatários, sob a guarda da Esfinge.
+              Este site não realiza atividades de corretagem ou intermediação imobiliária. A atividade de corretagem de imóveis é exercida de forma autônoma e exclusiva pelos corretores de imóveis e imobiliárias devidamente registrados nos órgãos competentes (CRECI).
             </p>
           </div>
 
@@ -589,7 +558,9 @@ export default function Home() {
                 </span>
               </div>
               <h2 className="text-2xl font-black text-amber-400 mt-3">{imovelSelecionado.titulo}</h2>
-              <p className="text-xs text-amber-200/80 font-extrabold mt-1">📍 {imovelSelecionado.bairro}, {imovelSelecionado.cidade} • {imovelSelecionado.tipo}</p>
+              <p className="text-xs text-amber-200/80 font-extrabold mt-1">
+                📍 {imovelSelecionado.bairro}, {imovelSelecionado.cidade} • {imovelSelecionado.tipo}
+              </p>
               <p className="text-3xl font-black text-amber-500 mt-3">
                 R$ {Number(imovelSelecionado.preco).toLocaleString("pt-BR")}
               </p>
@@ -608,7 +579,7 @@ export default function Home() {
               </div>
               <a
                 href={`https://wa.me/55${imovelSelecionado.corretor.telefone}?text=${encodeURIComponent(
-                  `Olá ${imovelSelecionado.corretor.nome}! Tenho interesse no imóvel ${imovelSelecionado.titulo} (Ref: ${imovelSelecionado.codigo})`
+                  `Olá! Tenho interesse no imóvel ${imovelSelecionado.titulo} (Ref: ${imovelSelecionado.codigo})`
                 )}`}
                 target="_blank"
                 rel="noreferrer"
