@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -37,7 +37,6 @@ export default function AdminPage() {
     aceita_pet: true,
   });
 
-  // Autenticação simples
   const handleLogin = (e) => {
     e.preventDefault();
     if (senhaInput === "admin" || senhaInput === "esfinge" || senhaInput === "123456") {
@@ -48,7 +47,6 @@ export default function AdminPage() {
     }
   };
 
-  // Carregar imóveis
   const carregarImoveis = async () => {
     setLoading(true);
     try {
@@ -73,7 +71,6 @@ export default function AdminPage() {
     }
   }, [isAuthenticated]);
 
-  // Cadastrar Imóvel
   const handleCadastrar = async (e) => {
     e.preventDefault();
     setSalvando(true);
@@ -96,9 +93,12 @@ export default function AdminPage() {
         banheiros: Number(novoImovel.banheiros) || 0,
         vagas: Number(novoImovel.vagas) || 0,
         area_m2: Number(novoImovel.area_m2) || null,
-        imagem_url: novoImovel.imagem_url || "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
+        imagem_url:
+          novoImovel.imagem_url ||
+          "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
         imagens: [
-          novoImovel.imagem_url || "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80"
+          novoImovel.imagem_url ||
+            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
         ],
         descricao: novoImovel.descricao,
         com_ar_condicionado: Boolean(novoImovel.com_ar_condicionado),
@@ -147,7 +147,6 @@ export default function AdminPage() {
     }
   };
 
-  // Alternar Ativo/Inativo
   const alternarAtivo = async (id, statusAtual) => {
     try {
       const { error } = await supabase
@@ -165,7 +164,6 @@ export default function AdminPage() {
     }
   };
 
-  // Excluir Imóvel
   const excluirImovel = async (id) => {
     if (!confirm("Tem certeza que deseja excluir este imóvel?")) return;
 
@@ -181,7 +179,6 @@ export default function AdminPage() {
     }
   };
 
-  // Tela de Login
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
@@ -196,7 +193,9 @@ export default function AdminPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-amber-200 block mb-1.5">Senha de Acesso</label>
+              <label className="text-xs font-bold text-amber-200 block mb-1.5">
+                Senha de Acesso
+              </label>
               <input
                 type="password"
                 value={senhaInput}
@@ -227,7 +226,6 @@ export default function AdminPage() {
     );
   }
 
-  // Painel Administrativo Principal
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -263,7 +261,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* FORMULÁRIO DE CADASTRO */}
+        {/* CADASTRO DE IMÓVEL */}
         <div className="bg-neutral-900 border border-amber-600/30 p-6 sm:p-8 rounded-3xl space-y-6">
           <h2 className="text-lg font-black text-amber-400 flex items-center gap-2">
             <span>➕</span>
@@ -345,7 +343,11 @@ export default function AdminPage() {
 
               <div>
                 <label className="text-xs font-bold text-amber-200 block mb-1">
-                  {novoImovel.modalidade === "Temporada" ? "Valor da Diária (R$)" : novoImovel.modalidade.includes("Locação") ? "Aluguel Mensal (R$)" : "Preço de Venda (R$)"}
+                  {novoImovel.modalidade === "Temporada"
+                    ? "Valor da Diária (R$)"
+                    : novoImovel.modalidade.includes("Locação")
+                    ? "Aluguel Mensal (R$)"
+                    : "Preço de Venda (R$)"}
                 </label>
                 <input
                   type="number"
@@ -426,7 +428,9 @@ export default function AdminPage() {
                 <input
                   type="checkbox"
                   checked={novoImovel.com_ar_condicionado}
-                  onChange={(e) => setNovoImovel({ ...novoImovel, com_ar_condicionado: e.target.checked })}
+                  onChange={(e) =>
+                    setNovoImovel({ ...novoImovel, com_ar_condicionado: e.target.checked })
+                  }
                   className="accent-amber-500"
                 />
                 <span>Ar-Condicionado</span>
@@ -463,7 +467,7 @@ export default function AdminPage() {
           </form>
         </div>
 
-        {/* LISTAGEM DE IMÓVEIS EXISTENTES */}
+        {/* LISTAGEM DE IMÓVEIS */}
         <div className="bg-neutral-900 border border-amber-600/30 p-6 sm:p-8 rounded-3xl space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black text-amber-400 flex items-center gap-2">
@@ -510,7 +514,10 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="p-3 font-bold text-amber-300">
-                        {Number(imv.preco).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                        {Number(imv.preco).toLocaleString("pt-BR", {
+                          style: "currency",
+                          currency: "BRL",
+                        })}
                       </td>
                       <td className="p-3">
                         <button

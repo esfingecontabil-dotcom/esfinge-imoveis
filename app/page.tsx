@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
-import BannerPosicionamento from "@/components/BannerPosicionamento";
+import { supabase } from "../lib/supabase";
+import BannerPosicionamento from "../components/BannerPosicionamento";
 
 export interface Imovel {
   id: number | string;
@@ -70,11 +70,14 @@ export default function Home() {
 
         if (data && data.length > 0) {
           const formatados: Imovel[] = data.map((item: any) => {
-            const fotos = Array.isArray(item.imagens) && item.imagens.length > 0
-              ? item.imagens
-              : item.imagem_url
-              ? [item.imagem_url]
-              : ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"];
+            const fotos =
+              Array.isArray(item.imagens) && item.imagens.length > 0
+                ? item.imagens
+                : item.imagem_url
+                ? [item.imagem_url]
+                : [
+                    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
+                  ];
 
             return {
               id: item.id,
@@ -101,7 +104,7 @@ export default function Home() {
                 nome: "Atendimento Esfinge",
                 creci: "PR-45920",
                 telefone: "44997278694",
-              }
+              },
             };
           });
 
@@ -123,7 +126,10 @@ export default function Home() {
   }, [imoveis]);
 
   const formatarPreco = (imovel: Imovel) => {
-    const val = Number(imovel.preco).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const val = Number(imovel.preco).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
     const mod = imovel.modalidade.toLowerCase();
     if (mod.includes("temporada") || mod.includes("veraneio")) {
       return `${val} / diária`;
@@ -145,15 +151,29 @@ export default function Home() {
         if (!matchTitulo && !matchBairro && !matchCidade && !matchCodigo) return false;
       }
 
-      if (categoriaSelecionada !== "Todos" && imovel.tipo.toLowerCase() !== categoriaSelecionada.toLowerCase()) {
+      if (
+        categoriaSelecionada !== "Todos" &&
+        imovel.tipo.toLowerCase() !== categoriaSelecionada.toLowerCase()
+      ) {
         return false;
       }
 
       if (modalidade !== "Todos") {
         const modImovel = imovel.modalidade.toLowerCase();
         const modFiltro = modalidade.toLowerCase();
-        if (modFiltro === "temporada" && !modImovel.includes("temporada") && !modImovel.includes("veraneio")) return false;
-        if (modFiltro === "locacao" && !modImovel.includes("anual") && !modImovel.includes("aluguel") && !modImovel.includes("locação")) return false;
+        if (
+          modFiltro === "temporada" &&
+          !modImovel.includes("temporada") &&
+          !modImovel.includes("veraneio")
+        )
+          return false;
+        if (
+          modFiltro === "locacao" &&
+          !modImovel.includes("anual") &&
+          !modImovel.includes("aluguel") &&
+          !modImovel.includes("locação")
+        )
+          return false;
         if (modFiltro === "venda" && !modImovel.includes("venda")) return false;
       }
 
@@ -234,7 +254,7 @@ export default function Home() {
           </div>
         </header>
 
-        {/* PAINEL PRINCIPAL COM FILTROS */}
+        {/* FILTROS E BUSCA */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-12 pb-16">
           <div className="bg-neutral-900/90 p-6 sm:p-8 rounded-3xl border border-amber-600/30 shadow-2xl space-y-5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-600/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -344,7 +364,9 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {imoveisFiltrados.map((imovel) => {
                 const isFav = favoritos.includes(imovel.id);
-                const isTemporada = imovel.modalidade.toLowerCase().includes("temporada") || imovel.modalidade.toLowerCase().includes("veraneio");
+                const isTemporada =
+                  imovel.modalidade.toLowerCase().includes("temporada") ||
+                  imovel.modalidade.toLowerCase().includes("veraneio");
 
                 return (
                   <div
@@ -402,7 +424,9 @@ export default function Home() {
                           <div>🛏️ {imovel.quartos} qts</div>
                           <div>🚿 {imovel.banheiros} ban</div>
                           <div>🚗 {imovel.vagas} vag</div>
-                          {isTemporada && imovel.capacidadePessoas && imovel.capacidadePessoas > 0 ? (
+                          {isTemporada &&
+                          imovel.capacidadePessoas &&
+                          imovel.capacidadePessoas > 0 ? (
                             <div>👥 {imovel.capacidadePessoas} pess</div>
                           ) : (
                             <div>📐 {imovel.areaUtil}m²</div>
@@ -413,7 +437,11 @@ export default function Home() {
                       <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
                         <div>
                           <span className="text-[10px] text-neutral-400 block font-black uppercase tracking-wider">
-                            {isTemporada ? "Valor da Diária" : imovel.modalidade.includes("Locação") ? "Aluguel Mensal" : "Valor de Venda"}
+                            {isTemporada
+                              ? "Valor da Diária"
+                              : imovel.modalidade.includes("Locação")
+                              ? "Aluguel Mensal"
+                              : "Valor de Venda"}
                           </span>
                           <span className="text-xl font-black text-amber-400">
                             {formatarPreco(imovel)}
@@ -449,7 +477,9 @@ export default function Home() {
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black text-white font-serif leading-tight">
                   É Corretor ou Imobiliária? <br className="hidden sm:inline" />
-                  <span className="text-amber-500">Divulgue suas locações e vendas sob a nossa guarda.</span>
+                  <span className="text-amber-500">
+                    Divulgue suas locações e vendas sob a nossa guarda.
+                  </span>
                 </h2>
                 <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-2xl">
                   Plataforma moderna para conectar sua carteira de temporada e anual a turistas e novos moradores de todo o estado.
@@ -513,9 +543,15 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4 border-y border-neutral-800 text-center text-xs font-black text-amber-200">
-              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">🛏️ {imovelSelecionado.quartos} Quartos</div>
-              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">🚿 {imovelSelecionado.banheiros} Banheiros</div>
-              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">🚗 {imovelSelecionado.vagas} Vagas</div>
+              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">
+                🛏️ {imovelSelecionado.quartos} Quartos
+              </div>
+              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">
+                🚿 {imovelSelecionado.banheiros} Banheiros
+              </div>
+              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">
+                🚗 {imovelSelecionado.vagas} Vagas
+              </div>
               <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">
                 {imovelSelecionado.capacidadePessoas && imovelSelecionado.capacidadePessoas > 0
                   ? `👥 ${imovelSelecionado.capacidadePessoas} Pessoas`
@@ -525,9 +561,15 @@ export default function Home() {
 
             <div className="bg-black border border-amber-600/30 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
               <div>
-                <span className="text-[10px] text-amber-500 font-black tracking-widest block uppercase">Atendimento</span>
-                <span className="font-extrabold text-white text-base">{imovelSelecionado.corretor.nome}</span>
-                <span className="text-xs text-neutral-400 block">CRECI: {imovelSelecionado.corretor.creci}</span>
+                <span className="text-[10px] text-amber-500 font-black tracking-widest block uppercase">
+                  Atendimento
+                </span>
+                <span className="font-extrabold text-white text-base">
+                  {imovelSelecionado.corretor.nome}
+                </span>
+                <span className="text-xs text-neutral-400 block">
+                  CRECI: {imovelSelecionado.corretor.creci}
+                </span>
               </div>
               <a
                 href={`https://wa.me/55${imovelSelecionado.corretor.telefone}?text=${encodeURIComponent(
