@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import BannerPosicionamento from "@/components/BannerPosicionamento";
 
-export const dynamic = "force-dynamic";
-
 export interface Imovel {
   id: number | string;
   codigo: string;
@@ -32,7 +30,6 @@ export interface Imovel {
     creci: string;
     telefone: string;
   };
-  destaque?: boolean;
 }
 
 const CATEGORIAS = [
@@ -104,8 +101,7 @@ export default function Home() {
                 nome: "Atendimento Esfinge",
                 creci: "PR-45920",
                 telefone: "44997278694",
-              },
-              destaque: item.destaque || false,
+              }
             };
           });
 
