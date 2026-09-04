@@ -25,10 +25,12 @@ export interface Imovel {
   arCondicionado: boolean;
   comPiscina: boolean;
   imagens: string[];
+  linkOrigem?: string;
   corretor: {
     nome: string;
     creci: string;
     telefone: string;
+    imobiliaria: string;
   };
 }
 
@@ -79,10 +81,14 @@ export default function Home() {
                     "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
                   ];
 
+            // Telefone limpo do corretor de origem (ou fallback para central se não houver)
+            const telBruto = (item.corretor_telefone || item.telefone || "44997278694").replace(/\D/g, "");
+            const telefoneFormatado = telBruto.startsWith("55") ? telBruto : `55${telBruto}`;
+
             return {
               id: item.id,
               codigo: item.codigo || `ESF-${item.id}`,
-              titulo: item.titulo || "Imóvel Esfinge",
+              titulo: item.titulo || "Imóvel no Litoral",
               descricao: item.descricao || "",
               tipo: item.tipo || "Casa",
               cidade: item.cidade || "Matinhos",
@@ -100,10 +106,12 @@ export default function Home() {
               arCondicionado: item.com_ar_condicionado ?? item.ar_condicionado ?? true,
               comPiscina: item.com_piscina ?? false,
               imagens: fotos,
+              linkOrigem: item.link_origem || "",
               corretor: {
-                nome: "Atendimento Esfinge",
-                creci: "PR-45920",
-                telefone: "44997278694",
+                nome: item.corretor_nome || item.imobiliaria_origem || "Corretor Credenciado",
+                creci: item.corretor_creci || "Credenciado",
+                telefone: telefoneFormatado,
+                imobiliaria: item.imobiliaria_origem || "Imobiliária Parceira",
               },
             };
           });
@@ -140,6 +148,11 @@ export default function Home() {
     return val;
   };
 
+  const gerarLinkWhatsAppCorretor = (imovel: Imovel) => {
+    const texto = `Olá ${imovel.corretor.nome}! Vi o anúncio do imóvel "${imovel.titulo}" (Ref: ${imovel.codigo}) no Portal Esfinge Imóveis (portalesfingeimoveis.com.br) e gostaria de mais informações.`;
+    return `https://wa.me/${imovel.corretor.telefone}?text=${encodeURIComponent(texto)}`;
+  };
+
   const imoveisFiltrados = useMemo(() => {
     return imoveis.filter((imovel) => {
       if (buscaTexto.trim() !== "") {
@@ -148,7 +161,8 @@ export default function Home() {
         const matchBairro = imovel.bairro.toLowerCase().includes(termo);
         const matchCidade = imovel.cidade.toLowerCase().includes(termo);
         const matchCodigo = imovel.codigo.toLowerCase().includes(termo);
-        if (!matchTitulo && !matchBairro && !matchCidade && !matchCodigo) return false;
+        const matchCorretor = imovel.corretor.nome.toLowerCase().includes(termo);
+        if (!matchTitulo && !matchBairro && !matchCidade && !matchCodigo && !matchCorretor) return false;
       }
 
       if (
@@ -210,7 +224,7 @@ export default function Home() {
                   ESFINGE
                 </span>
                 <span className="text-amber-200/80 text-[10px] sm:text-[11px] font-extrabold tracking-widest uppercase">
-                  GUARDIÃO DE IMÓVEIS
+                  PORTAL DE IMÓVEIS
                 </span>
               </div>
             </div>
@@ -220,16 +234,16 @@ export default function Home() {
                 href="/admin"
                 className="text-xs sm:text-sm font-semibold text-amber-200/90 hover:text-amber-400 px-4 py-2 rounded-full hover:bg-neutral-900 transition border border-amber-600/30"
               >
-                <span>👨‍💼 Área do Corretor</span>
+                <span>👨‍💼 Painel / Corretores</span>
               </a>
               <a
-                href="https://wa.me/5544997278694"
+                href="https://wa.me/5544997278694?text=Olá!%20Gostaria%20de%20anunciar%20meus%20imóveis%20no%20Portal%20Esfinge."
                 target="_blank"
                 rel="noreferrer"
-                className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-full shadow-lg shadow-emerald-900/40 transition inline-flex items-center justify-center space-x-1.5"
+                className="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black text-xs sm:text-sm font-black px-5 py-2.5 rounded-full shadow-lg transition inline-flex items-center justify-center space-x-1.5"
               >
-                <span>💬</span>
-                <span>Falar no WhatsApp</span>
+                <span>🤝</span>
+                <span>Anunciar Imóveis</span>
               </a>
             </div>
           </div>
@@ -264,7 +278,7 @@ export default function Home() {
                 <span className="absolute left-4 top-3.5 text-amber-500 font-bold">🔍</span>
                 <input
                   type="text"
-                  placeholder="Busque por código, bairro, cidade ou título..."
+                  placeholder="Busque por cidade, bairro, corretor ou código..."
                   value={buscaTexto}
                   onChange={(e) => setBuscaTexto(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 bg-black border border-amber-600/30 rounded-2xl text-xs sm:text-sm outline-none focus:border-amber-500 text-amber-100 placeholder-neutral-500 font-semibold transition"
@@ -279,7 +293,7 @@ export default function Home() {
                 >
                   <option value="Todos">Todas as Modalidades</option>
                   <option value="Temporada">🏖️ Temporada (Veraneio)</option>
-                  <option value="Locacao">🔑 Locação Anual (Integral)</option>
+                  <option value="Locacao">🔑 Locação Anual</option>
                   <option value="Venda">🏷️ Venda</option>
                 </select>
 
@@ -325,13 +339,13 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-amber-500 tracking-tight flex items-center gap-2 font-serif">
-                <span>Imóveis sob a Guarda da Esfinge</span>
+                <span>Vitrine de Imóveis no Paraná</span>
                 <span className="text-xs bg-amber-950/80 text-amber-300 font-extrabold px-3 py-1 rounded-full border border-amber-700/50 font-sans">
                   {imoveisFiltrados.length} disponíveis
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-                Vendas, Locação Anual e Casas de Temporada no Litoral e Região
+                Conectando você diretamente aos corretores e proprietários de Matinhos, Pontal, Guaratuba e Maringá.
               </p>
             </div>
           </div>
@@ -420,6 +434,12 @@ export default function Home() {
                         <h3 className="font-black text-amber-100 text-lg line-clamp-1 group-hover:text-amber-400 transition-colors">
                           {imovel.titulo}
                         </h3>
+                        
+                        <p className="text-[11px] text-neutral-400 mt-1 font-semibold flex items-center gap-1">
+                          <span>👤 Corretor:</span>
+                          <strong className="text-amber-300">{imovel.corretor.nome}</strong>
+                        </p>
+
                         <div className="grid grid-cols-4 gap-1 text-[11px] text-amber-200/70 mt-3 font-bold bg-black/50 p-2.5 rounded-2xl border border-amber-600/20 text-center">
                           <div>🛏️ {imovel.quartos} qts</div>
                           <div>🚿 {imovel.banheiros} ban</div>
@@ -448,9 +468,7 @@ export default function Home() {
                           </span>
                         </div>
                         <a
-                          href={`https://wa.me/55${imovel.corretor.telefone}?text=${encodeURIComponent(
-                            `Olá! Gostaria de informações sobre o imóvel (${imovel.modalidade}) ${imovel.titulo} (Ref: ${imovel.codigo})`
-                          )}`}
+                          href={gerarLinkWhatsAppCorretor(imovel)}
                           onClick={(e) => e.stopPropagation()}
                           target="_blank"
                           rel="noreferrer"
@@ -478,23 +496,23 @@ export default function Home() {
                 <h2 className="text-2xl sm:text-3xl font-black text-white font-serif leading-tight">
                   É Corretor ou Imobiliária? <br className="hidden sm:inline" />
                   <span className="text-amber-500">
-                    Divulgue suas locações e vendas sob a nossa guarda.
+                    Divulgue seus imóveis no Portal Esfinge e receba leads diretos.
                   </span>
                 </h2>
                 <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-2xl">
-                  Plataforma moderna para conectar sua carteira de temporada e anual a turistas e novos moradores de todo o estado.
+                  Cada lead gerado no portal vai direto para o seu WhatsApp com a referência do imóvel, sem intermediários.
                 </p>
               </div>
 
               <div className="bg-black border border-amber-600/40 p-6 rounded-2xl text-center space-y-4 shadow-xl">
                 <h3 className="font-extrabold text-amber-400 text-lg">Quero Anunciar Meu Portfólio</h3>
                 <a
-                  href="https://wa.me/5544997278694?text=Olá!%20Sou%20corretor/imobiliária%20e%20gostaria%20de%20anunciar%20meus%20imóveis%20na%20Esfinge."
+                  href="https://wa.me/5544997278694?text=Olá!%20Sou%20corretor/imobiliária%20e%20gostaria%20de%20anunciar%20meus%20imóveis%20no%20Portal%20Esfinge."
                   target="_blank"
                   rel="noreferrer"
                   className="block w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-3 rounded-xl text-xs transition shadow-lg uppercase tracking-wider"
                 >
-                  💬 Falar no WhatsApp
+                  💬 Falar com a Esfinge
                 </a>
               </div>
             </div>
@@ -559,22 +577,21 @@ export default function Home() {
               </div>
             </div>
 
+            {/* BOX DE CONTATO DIRETO DO CORRETOR RESPONSÁVEL */}
             <div className="bg-black border border-amber-600/30 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
               <div>
                 <span className="text-[10px] text-amber-500 font-black tracking-widest block uppercase">
-                  Atendimento
+                  Corretor / Imobiliária Responsável
                 </span>
                 <span className="font-extrabold text-white text-base">
                   {imovelSelecionado.corretor.nome}
                 </span>
                 <span className="text-xs text-neutral-400 block">
-                  CRECI: {imovelSelecionado.corretor.creci}
+                  CRECI: {imovelSelecionado.corretor.creci} {imovelSelecionado.corretor.imobiliaria ? `• ${imovelSelecionado.corretor.imobiliaria}` : ''}
                 </span>
               </div>
               <a
-                href={`https://wa.me/55${imovelSelecionado.corretor.telefone}?text=${encodeURIComponent(
-                  `Olá! Gostaria de saber mais sobre a locação/venda do imóvel ${imovelSelecionado.titulo} (Ref: ${imovelSelecionado.codigo})`
-                )}`}
+                href={gerarLinkWhatsAppCorretor(imovelSelecionado)}
                 target="_blank"
                 rel="noreferrer"
                 className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3.5 rounded-xl text-xs font-extrabold transition shadow-lg shadow-emerald-950/50 flex items-center gap-2 w-full sm:w-auto justify-center"
