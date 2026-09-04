@@ -28,12 +28,12 @@ export default function AdminLoginPage() {
       });
 
       if (authError) {
-        setError("Email ou senha inválidos. Tente novamente.");
+        setError("Email ou senha inválidos.");
       } else {
         router.push("/admin");
       }
-    } catch (err: any) {
-      setError("Erro ao autenticar. Verifique seus dados.");
+    } catch (err) {
+      setError("Erro ao autenticar.");
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-amber-200 block mb-1.5">Email (ou Login)</label>
+            <label className="text-xs font-bold text-amber-200 block mb-1.5">Email / Usuário</label>
             <input
               type="text"
               value={email}
