@@ -10,6 +10,7 @@ export interface Imovel {
   titulo: string;
   descricao?: string;
   tipo: string;
+  estado: string;
   cidade: string;
   bairro: string;
   modalidade: string;
@@ -47,18 +48,23 @@ export default function Home() {
   const [imoveis, setImoveis] = useState<Imovel[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Filtros
   const [buscaTexto, setBuscaTexto] = useState("");
   const [categoriaSelecionada, setCategoriaSelecionada] = useState("Todos");
   const [modalidade, setModalidade] = useState<string>("Todos");
-  const [cidade, setCidade] = useState("Todas");
+  const [estadoSelecionado, setEstadoSelecionado] = useState<string>("Todos");
+  const [cidadeSelecionada, setCidadeSelecionada] = useState<string>("Todas");
   const [apenasPet, setApenasPet] = useState(false);
   const [apenasAr, setApenasAr] = useState(false);
   const [favoritos, setFavoritos] = useState<(number | string)[]>([]);
 
+  // Detecção por IP
+  const [localizacaoDetectada, setLocalizacaoDetectada] = useState<{ cidade: string; estado: string } | null>(null);
   const [imovelSelecionado, setImovelSelecionado] = useState<Imovel | null>(null);
 
+  // 1. Carregar imóveis do Supabase
   useEffect(() => {
-    async function carregarImoveisPublicos() {
+    async function carregarImoveis() {
       try {
         const { data, error } = await supabase
           .from("imoveis")
@@ -81,16 +87,16 @@ export default function Home() {
                     "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
                   ];
 
-            // Telefone limpo do corretor de origem (ou fallback para central se não houver)
             const telBruto = (item.corretor_telefone || item.telefone || "44997278694").replace(/\D/g, "");
             const telefoneFormatado = telBruto.startsWith("55") ? telBruto : `55${telBruto}`;
 
             return {
               id: item.id,
               codigo: item.codigo || `ESF-${item.id}`,
-              titulo: item.titulo || "Imóvel no Litoral",
+              titulo: item.titulo || "Imóvel em Destaque",
               descricao: item.descricao || "",
               tipo: item.tipo || "Casa",
+              estado: item.estado || "PR",
               cidade: item.cidade || "Matinhos",
               bairro: item.bairro || item.bairro_balneario || "Centro",
               modalidade: item.modalidade || "Venda",
@@ -125,13 +131,48 @@ export default function Home() {
       }
     }
 
-    carregarImoveisPublicos();
+    carregarImoveis();
   }, []);
 
-  const cidadesDisponiveis = useMemo(() => {
-    const lista = Array.from(new Set(imoveis.map((imv) => imv.cidade))).filter(Boolean);
-    return ["Todas", ...lista];
+  // 2. Detecção automática de geolocalização via /api/geo
+  useEffect(() => {
+    async function detectarGeo() {
+      try {
+        const res = await fetch("/api/geo");
+        const geo = await res.json();
+
+        if (geo.cidade || geo.estado) {
+          setLocalizacaoDetectada({ cidade: geo.cidade, estado: geo.estado });
+
+          // Se existirem imóveis na cidade detectada, aplica o filtro inicial inteligente
+          if (geo.cidade && imoveis.some((imv) => imv.cidade.toLowerCase() === geo.cidade.toLowerCase())) {
+            setCidadeSelecionada(geo.cidade);
+          } else if (geo.estado && imoveis.some((imv) => imv.estado.toLowerCase() === geo.estado.toLowerCase())) {
+            setEstadoSelecionado(geo.estado);
+          }
+        }
+      } catch (e) {
+        console.log("Não foi possível detectar a localização por IP");
+      }
+    }
+
+    if (imoveis.length > 0 && !localizacaoDetectada) {
+      detectarGeo();
+    }
   }, [imoveis]);
+
+  // Lista dinâmica de Estados e Cidades disponíveis
+  const estadosDisponiveis = useMemo(() => {
+    const lista = Array.from(new Set(imoveis.map((imv) => imv.estado))).filter(Boolean);
+    return ["Todos", ...lista];
+  }, [imoveis]);
+
+  const cidadesDisponiveis = useMemo(() => {
+    const lista = imoveis
+      .filter((imv) => (estadoSelecionado === "Todos" ? true : imv.estado === estadoSelecionado))
+      .map((imv) => imv.cidade);
+    return ["Todas", ...Array.from(new Set(lista)).filter(Boolean)];
+  }, [imoveis, estadoSelecionado]);
 
   const formatarPreco = (imovel: Imovel) => {
     const val = Number(imovel.preco).toLocaleString("pt-BR", {
@@ -139,12 +180,8 @@ export default function Home() {
       currency: "BRL",
     });
     const mod = imovel.modalidade.toLowerCase();
-    if (mod.includes("temporada") || mod.includes("veraneio")) {
-      return `${val} / diária`;
-    }
-    if (mod.includes("aluguel") || mod.includes("locação") || mod.includes("locacao")) {
-      return `${val} / mês`;
-    }
+    if (mod.includes("temporada") || mod.includes("veraneio")) return `${val} / diária`;
+    if (mod.includes("aluguel") || mod.includes("locação") || mod.includes("locacao")) return `${val} / mês`;
     return val;
   };
 
@@ -160,9 +197,18 @@ export default function Home() {
         const matchTitulo = imovel.titulo.toLowerCase().includes(termo);
         const matchBairro = imovel.bairro.toLowerCase().includes(termo);
         const matchCidade = imovel.cidade.toLowerCase().includes(termo);
+        const matchEstado = imovel.estado.toLowerCase().includes(termo);
         const matchCodigo = imovel.codigo.toLowerCase().includes(termo);
         const matchCorretor = imovel.corretor.nome.toLowerCase().includes(termo);
-        if (!matchTitulo && !matchBairro && !matchCidade && !matchCodigo && !matchCorretor) return false;
+        if (!matchTitulo && !matchBairro && !matchCidade && !matchEstado && !matchCodigo && !matchCorretor) return false;
+      }
+
+      if (estadoSelecionado !== "Todos" && imovel.estado.toLowerCase() !== estadoSelecionado.toLowerCase()) {
+        return false;
+      }
+
+      if (cidadeSelecionada !== "Todas" && imovel.cidade.toLowerCase() !== cidadeSelecionada.toLowerCase()) {
+        return false;
       }
 
       if (
@@ -175,24 +221,9 @@ export default function Home() {
       if (modalidade !== "Todos") {
         const modImovel = imovel.modalidade.toLowerCase();
         const modFiltro = modalidade.toLowerCase();
-        if (
-          modFiltro === "temporada" &&
-          !modImovel.includes("temporada") &&
-          !modImovel.includes("veraneio")
-        )
-          return false;
-        if (
-          modFiltro === "locacao" &&
-          !modImovel.includes("anual") &&
-          !modImovel.includes("aluguel") &&
-          !modImovel.includes("locação")
-        )
-          return false;
+        if (modFiltro === "temporada" && !modImovel.includes("temporada") && !modImovel.includes("veraneio")) return false;
+        if (modFiltro === "locacao" && !modImovel.includes("anual") && !modImovel.includes("aluguel") && !modImovel.includes("locação")) return false;
         if (modFiltro === "venda" && !modImovel.includes("venda")) return false;
-      }
-
-      if (cidade !== "Todas" && imovel.cidade.toLowerCase() !== cidade.toLowerCase()) {
-        return false;
       }
 
       if (apenasPet && !imovel.aceitaPet) return false;
@@ -200,13 +231,11 @@ export default function Home() {
 
       return true;
     });
-  }, [imoveis, buscaTexto, categoriaSelecionada, modalidade, cidade, apenasPet, apenasAr]);
+  }, [imoveis, buscaTexto, categoriaSelecionada, modalidade, estadoSelecionado, cidadeSelecionada, apenasPet, apenasAr]);
 
   const toggleFavorito = (id: number | string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavoritos((prev) =>
-      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]
-    );
+    setFavoritos((prev) => (prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]));
   };
 
   return (
@@ -224,7 +253,7 @@ export default function Home() {
                   ESFINGE
                 </span>
                 <span className="text-amber-200/80 text-[10px] sm:text-[11px] font-extrabold tracking-widest uppercase">
-                  PORTAL DE IMÓVEIS
+                  PORTAL NACIONAL DE IMÓVEIS
                 </span>
               </div>
             </div>
@@ -234,7 +263,7 @@ export default function Home() {
                 href="/admin"
                 className="text-xs sm:text-sm font-semibold text-amber-200/90 hover:text-amber-400 px-4 py-2 rounded-full hover:bg-neutral-900 transition border border-amber-600/30"
               >
-                <span>👨‍💼 Painel / Corretores</span>
+                <span>👨‍💼 Corretores / Login</span>
               </a>
               <a
                 href="https://wa.me/5544997278694?text=Olá!%20Gostaria%20de%20anunciar%20meus%20imóveis%20no%20Portal%20Esfinge."
@@ -269,12 +298,32 @@ export default function Home() {
         </header>
 
         {/* FILTROS E BUSCA */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-12 pb-16">
-          <div className="bg-neutral-900/90 p-6 sm:p-8 rounded-3xl border border-amber-600/30 shadow-2xl space-y-5 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-600/10 rounded-full blur-2xl pointer-events-none"></div>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8 pb-16">
+          
+          {/* BARRA DE LOCALIZAÇÃO INTELIGENTE */}
+          {localizacaoDetectada?.cidade && (
+            <div className="bg-amber-950/40 border border-amber-600/30 rounded-2xl px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-400 font-bold">📍 Sua localização aproximada:</span>
+                <span className="font-extrabold text-white bg-black/60 px-3 py-1 rounded-lg border border-amber-600/20">
+                  {localizacaoDetectada.cidade} - {localizacaoDetectada.estado || "Brasil"}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setEstadoSelecionado("Todos");
+                  setCidadeSelecionada("Todas");
+                }}
+                className="text-amber-400 hover:text-amber-300 font-extrabold underline cursor-pointer"
+              >
+                🌐 Ver imóveis de todo o Brasil
+              </button>
+            </div>
+          )}
 
+          <div className="bg-neutral-900/90 p-6 sm:p-8 rounded-3xl border border-amber-600/30 shadow-2xl space-y-5 relative overflow-hidden">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="w-full md:w-1/2 relative">
+              <div className="w-full md:w-5/12 relative">
                 <span className="absolute left-4 top-3.5 text-amber-500 font-bold">🔍</span>
                 <input
                   type="text"
@@ -285,21 +334,28 @@ export default function Home() {
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-7/12 justify-end">
+                {/* SELECT ESTADO */}
                 <select
-                  value={modalidade}
-                  onChange={(e) => setModalidade(e.target.value)}
+                  value={estadoSelecionado}
+                  onChange={(e) => {
+                    setEstadoSelecionado(e.target.value);
+                    setCidadeSelecionada("Todas");
+                  }}
                   className="p-3.5 bg-black border border-amber-600/30 rounded-2xl text-xs sm:text-sm outline-none focus:border-amber-500 font-extrabold text-amber-400 cursor-pointer shadow-sm"
                 >
-                  <option value="Todos">Todas as Modalidades</option>
-                  <option value="Temporada">🏖️ Temporada (Veraneio)</option>
-                  <option value="Locacao">🔑 Locação Anual</option>
-                  <option value="Venda">🏷️ Venda</option>
+                  <option value="Todos">UF: Todos</option>
+                  {estadosDisponiveis.filter((uf) => uf !== "Todos").map((uf) => (
+                    <option key={uf} value={uf}>
+                      UF: {uf}
+                    </option>
+                  ))}
                 </select>
 
+                {/* SELECT CIDADE */}
                 <select
-                  value={cidade}
-                  onChange={(e) => setCidade(e.target.value)}
+                  value={cidadeSelecionada}
+                  onChange={(e) => setCidadeSelecionada(e.target.value)}
                   className="p-3.5 bg-black border border-amber-600/30 rounded-2xl text-xs sm:text-sm outline-none focus:border-amber-500 font-extrabold text-amber-400 cursor-pointer shadow-sm"
                 >
                   {cidadesDisponiveis.map((c) => (
@@ -307,6 +363,18 @@ export default function Home() {
                       {c === "Todas" ? "Todas as Cidades" : c}
                     </option>
                   ))}
+                </select>
+
+                {/* SELECT MODALIDADE */}
+                <select
+                  value={modalidade}
+                  onChange={(e) => setModalidade(e.target.value)}
+                  className="p-3.5 bg-black border border-amber-600/30 rounded-2xl text-xs sm:text-sm outline-none focus:border-amber-500 font-extrabold text-amber-400 cursor-pointer shadow-sm"
+                >
+                  <option value="Todos">Todas as Modalidades</option>
+                  <option value="Temporada">🏖️ Temporada</option>
+                  <option value="Locacao">🔑 Locação Anual</option>
+                  <option value="Venda">🏷️ Venda</option>
                 </select>
               </div>
             </div>
@@ -339,13 +407,13 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2">
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-amber-500 tracking-tight flex items-center gap-2 font-serif">
-                <span>Vitrine de Imóveis no Paraná</span>
+                <span>Vitrine de Imóveis</span>
                 <span className="text-xs bg-amber-950/80 text-amber-300 font-extrabold px-3 py-1 rounded-full border border-amber-700/50 font-sans">
                   {imoveisFiltrados.length} disponíveis
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-                Conectando você diretamente aos corretores e proprietários de Matinhos, Pontal, Guaratuba e Maringá.
+                Conectando você diretamente aos corretores e imobiliárias de origem.
               </p>
             </div>
           </div>
@@ -355,7 +423,7 @@ export default function Home() {
               Carregando vitrine de imóveis...
             </div>
           ) : imoveisFiltrados.length === 0 ? (
-            <div className="text-center py-28 bg-neutral-900 rounded-3xl border border-amber-600/30 space-y-4">
+            <div className="text-center py-24 bg-neutral-900 rounded-3xl border border-amber-600/30 space-y-4">
               <div className="text-4xl">🏰</div>
               <p className="text-base font-bold text-amber-200/80">
                 Nenhum imóvel encontrado com esses filtros.
@@ -365,13 +433,14 @@ export default function Home() {
                   setBuscaTexto("");
                   setCategoriaSelecionada("Todos");
                   setModalidade("Todos");
-                  setCidade("Todas");
+                  setEstadoSelecionado("Todos");
+                  setCidadeSelecionada("Todas");
                   setApenasPet(false);
                   setApenasAr(false);
                 }}
                 className="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black px-6 py-3 rounded-xl text-xs transition shadow-md"
               >
-                Limpar Filtros e Ver Todos
+                Limpar Filtros e Ver Todos os Imóveis
               </button>
             </div>
           ) : (
@@ -425,7 +494,7 @@ export default function Home() {
                       <div>
                         <div className="flex items-center justify-between text-xs font-bold mb-1.5">
                           <span className="text-amber-500 font-extrabold">
-                            📍 {imovel.bairro}, {imovel.cidade}
+                            📍 {imovel.bairro}, {imovel.cidade} - {imovel.estado}
                           </span>
                           <span className="bg-black border border-amber-600/20 px-2.5 py-1 rounded-md text-amber-200/80">
                             {imovel.tipo}
@@ -444,9 +513,7 @@ export default function Home() {
                           <div>🛏️ {imovel.quartos} qts</div>
                           <div>🚿 {imovel.banheiros} ban</div>
                           <div>🚗 {imovel.vagas} vag</div>
-                          {isTemporada &&
-                          imovel.capacidadePessoas &&
-                          imovel.capacidadePessoas > 0 ? (
+                          {isTemporada && imovel.capacidadePessoas && imovel.capacidadePessoas > 0 ? (
                             <div>👥 {imovel.capacidadePessoas} pess</div>
                           ) : (
                             <div>📐 {imovel.areaUtil}m²</div>
@@ -483,40 +550,6 @@ export default function Home() {
               })}
             </div>
           )}
-
-          {/* PARCEIROS */}
-          <section className="bg-gradient-to-r from-neutral-900 via-black to-neutral-900 border border-amber-600/40 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-600/10 rounded-full blur-3xl pointer-events-none"></div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
-              <div className="lg:col-span-2 space-y-4">
-                <div className="inline-flex items-center space-x-2 bg-amber-950/80 border border-amber-600/40 px-3 py-1 rounded-full text-amber-400 text-xs font-black uppercase tracking-wider">
-                  <span>🤝 Espaço Parceiros Esfinge</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-white font-serif leading-tight">
-                  É Corretor ou Imobiliária? <br className="hidden sm:inline" />
-                  <span className="text-amber-500">
-                    Divulgue seus imóveis no Portal Esfinge e receba leads diretos.
-                  </span>
-                </h2>
-                <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-2xl">
-                  Cada lead gerado no portal vai direto para o seu WhatsApp com a referência do imóvel, sem intermediários.
-                </p>
-              </div>
-
-              <div className="bg-black border border-amber-600/40 p-6 rounded-2xl text-center space-y-4 shadow-xl">
-                <h3 className="font-extrabold text-amber-400 text-lg">Quero Anunciar Meu Portfólio</h3>
-                <a
-                  href="https://wa.me/5544997278694?text=Olá!%20Sou%20corretor/imobiliária%20e%20gostaria%20de%20anunciar%20meus%20imóveis%20no%20Portal%20Esfinge."
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-3 rounded-xl text-xs transition shadow-lg uppercase tracking-wider"
-                >
-                  💬 Falar com a Esfinge
-                </a>
-              </div>
-            </div>
-          </section>
         </main>
       </div>
 
@@ -548,7 +581,7 @@ export default function Home() {
               </div>
               <h2 className="text-2xl font-black text-amber-400 mt-3">{imovelSelecionado.titulo}</h2>
               <p className="text-xs text-amber-200/80 font-extrabold mt-1">
-                📍 {imovelSelecionado.bairro}, {imovelSelecionado.cidade} • {imovelSelecionado.tipo}
+                📍 {imovelSelecionado.bairro}, {imovelSelecionado.cidade} - {imovelSelecionado.estado} • {imovelSelecionado.tipo}
               </p>
               <p className="text-3xl font-black text-amber-500 mt-3">
                 {formatarPreco(imovelSelecionado)}
@@ -577,7 +610,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* BOX DE CONTATO DIRETO DO CORRETOR RESPONSÁVEL */}
             <div className="bg-black border border-amber-600/30 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
               <div>
                 <span className="text-[10px] text-amber-500 font-black tracking-widest block uppercase">
