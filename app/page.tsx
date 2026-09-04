@@ -10,17 +10,22 @@ export interface Imovel {
   id: number | string;
   codigo: string;
   titulo: string;
+  descricao?: string;
   tipo: string;
   cidade: string;
   bairro: string;
-  modalidade: "Venda" | "Aluguel" | string;
+  modalidade: string;
   preco: number;
+  precoAltaTemporada?: number;
+  taxaLimpeza?: number;
+  capacidadePessoas?: number;
   quartos: number;
   banheiros: number;
   vagas: number;
   areaUtil: number;
   aceitaPet: boolean;
   arCondicionado: boolean;
+  comPiscina: boolean;
   imagens: string[];
   corretor: {
     nome: string;
@@ -45,11 +50,10 @@ export default function Home() {
 
   const [buscaTexto, setBuscaTexto] = useState("");
   const [categoriaSelecionada, setCategoriaSelecionada] = useState("Todos");
-  const [modalidade, setModalidade] = useState<"Todos" | "Venda" | "Aluguel">("Todos");
+  const [modalidade, setModalidade] = useState<string>("Todos");
   const [cidade, setCidade] = useState("Todas");
   const [apenasPet, setApenasPet] = useState(false);
   const [apenasAr, setApenasAr] = useState(false);
-  const [precoMaximo, setPrecoMaximo] = useState<number>(3000000);
   const [favoritos, setFavoritos] = useState<(number | string)[]>([]);
 
   const [imovelSelecionado, setImovelSelecionado] = useState<Imovel | null>(null);
@@ -79,17 +83,22 @@ export default function Home() {
               id: item.id,
               codigo: item.codigo || `ESF-${item.id}`,
               titulo: item.titulo || "Imóvel Esfinge",
+              descricao: item.descricao || "",
               tipo: item.tipo || "Casa",
               cidade: item.cidade || "Matinhos",
               bairro: item.bairro || item.bairro_balneario || "Centro",
               modalidade: item.modalidade || "Venda",
               preco: Number(item.preco) || 0,
+              precoAltaTemporada: Number(item.preco_alta_temporada) || 0,
+              taxaLimpeza: Number(item.taxa_limpeza) || 0,
+              capacidadePessoas: Number(item.capacidade_pessoas) || 0,
               quartos: Number(item.quartos) || 0,
               banheiros: Number(item.banheiros) || 0,
               vagas: Number(item.vagas) || 0,
               areaUtil: Number(item.area_m2) || Number(item.area_util) || Number(item.area) || 0,
               aceitaPet: item.aceita_pet ?? true,
               arCondicionado: item.com_ar_condicionado ?? item.ar_condicionado ?? true,
+              comPiscina: item.com_piscina ?? false,
               imagens: fotos,
               corretor: {
                 nome: "Atendimento Esfinge",
@@ -103,7 +112,7 @@ export default function Home() {
           setImoveis(formatados);
         }
       } catch (err) {
-        console.error("Erro inesperado ao buscar imóveis:", err);
+        console.error("Erro ao buscar imóveis:", err);
       } finally {
         setLoading(false);
       }
@@ -117,11 +126,16 @@ export default function Home() {
     return ["Todas", ...lista];
   }, [imoveis]);
 
-  const toggleFavorito = (id: number | string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setFavoritos((prev) =>
-      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]
-    );
+  const formatarPreco = (imovel: Imovel) => {
+    const val = Number(imovel.preco).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const mod = imovel.modalidade.toLowerCase();
+    if (mod.includes("temporada") || mod.includes("veraneio")) {
+      return `${val} / diária`;
+    }
+    if (mod.includes("aluguel") || mod.includes("locação") || mod.includes("locacao")) {
+      return `${val} / mês`;
+    }
+    return val;
   };
 
   const imoveisFiltrados = useMemo(() => {
@@ -139,21 +153,31 @@ export default function Home() {
         return false;
       }
 
-      if (modalidade !== "Todos" && imovel.modalidade.toLowerCase() !== modalidade.toLowerCase()) {
-        return false;
+      if (modalidade !== "Todos") {
+        const modImovel = imovel.modalidade.toLowerCase();
+        const modFiltro = modalidade.toLowerCase();
+        if (modFiltro === "temporada" && !modImovel.includes("temporada") && !modImovel.includes("veraneio")) return false;
+        if (modFiltro === "locacao" && !modImovel.includes("anual") && !modImovel.includes("aluguel") && !modImovel.includes("locação")) return false;
+        if (modFiltro === "venda" && !modImovel.includes("venda")) return false;
       }
 
       if (cidade !== "Todas" && imovel.cidade.toLowerCase() !== cidade.toLowerCase()) {
         return false;
       }
 
-      if (imovel.preco > 0 && imovel.preco > precoMaximo) return false;
       if (apenasPet && !imovel.aceitaPet) return false;
       if (apenasAr && !imovel.arCondicionado) return false;
 
       return true;
     });
-  }, [imoveis, buscaTexto, categoriaSelecionada, modalidade, cidade, precoMaximo, apenasPet, apenasAr]);
+  }, [imoveis, buscaTexto, categoriaSelecionada, modalidade, cidade, apenasPet, apenasAr]);
+
+  const toggleFavorito = (id: number | string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFavoritos((prev) =>
+      prev.includes(id) ? prev.filter((favId) => favId !== id) : [...prev, id]
+    );
+  };
 
   return (
     <div className="min-h-screen bg-neutral-950 font-sans text-neutral-100 flex flex-col justify-between selection:bg-amber-600 selection:text-black">
@@ -214,9 +238,8 @@ export default function Home() {
           </div>
         </header>
 
-        {/* CONTEÚDO PRINCIPAL */}
+        {/* PAINEL PRINCIPAL COM FILTROS */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-12 pb-16">
-          {/* PAINEL DE FILTROS */}
           <div className="bg-neutral-900/90 p-6 sm:p-8 rounded-3xl border border-amber-600/30 shadow-2xl space-y-5 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-600/10 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -231,16 +254,19 @@ export default function Home() {
                   className="w-full pl-11 pr-4 py-3.5 bg-black border border-amber-600/30 rounded-2xl text-xs sm:text-sm outline-none focus:border-amber-500 text-amber-100 placeholder-neutral-500 font-semibold transition"
                 />
               </div>
-              <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
+
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
                 <select
                   value={modalidade}
-                  onChange={(e) => setModalidade(e.target.value as any)}
+                  onChange={(e) => setModalidade(e.target.value)}
                   className="p-3.5 bg-black border border-amber-600/30 rounded-2xl text-xs sm:text-sm outline-none focus:border-amber-500 font-extrabold text-amber-400 cursor-pointer shadow-sm"
                 >
-                  <option value="Todos">Todas Modalidades</option>
-                  <option value="Venda">Venda</option>
-                  <option value="Aluguel">Aluguel</option>
+                  <option value="Todos">Todas as Modalidades</option>
+                  <option value="Temporada">🏖️ Temporada (Veraneio)</option>
+                  <option value="Locacao">🔑 Locação Anual (Integral)</option>
+                  <option value="Venda">🏷️ Venda</option>
                 </select>
+
                 <select
                   value={cidade}
                   onChange={(e) => setCidade(e.target.value)}
@@ -265,6 +291,7 @@ export default function Home() {
                 />
                 <span>🐾 Pet Friendly</span>
               </label>
+
               <label className="flex items-center space-x-2.5 cursor-pointer bg-black/60 hover:bg-black px-3 py-2 rounded-xl border border-amber-600/20 transition">
                 <input
                   type="checkbox"
@@ -274,18 +301,6 @@ export default function Home() {
                 />
                 <span>❄️ Ar-Condicionado</span>
               </label>
-              <div className="flex items-center space-x-3 ml-auto bg-black/60 px-4 py-2 rounded-xl border border-amber-600/20">
-                <span className="text-amber-400 font-bold">Até R$ {precoMaximo.toLocaleString("pt-BR")}</span>
-                <input
-                  type="range"
-                  min="100000"
-                  max="3000000"
-                  step="50000"
-                  value={precoMaximo}
-                  onChange={(e) => setPrecoMaximo(Number(e.target.value))}
-                  className="accent-amber-500 cursor-pointer w-32 sm:w-48"
-                />
-              </div>
             </div>
           </div>
 
@@ -300,7 +315,7 @@ export default function Home() {
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-                A melhor vitrine de imóveis em Maringá e Litoral do Paraná
+                Vendas, Locação Anual e Casas de Temporada no Litoral e Região
               </p>
             </div>
           </div>
@@ -323,7 +338,6 @@ export default function Home() {
                   setCidade("Todas");
                   setApenasPet(false);
                   setApenasAr(false);
-                  setPrecoMaximo(3000000);
                 }}
                 className="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black px-6 py-3 rounded-xl text-xs transition shadow-md"
               >
@@ -334,6 +348,8 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {imoveisFiltrados.map((imovel) => {
                 const isFav = favoritos.includes(imovel.id);
+                const isTemporada = imovel.modalidade.toLowerCase().includes("temporada") || imovel.modalidade.toLowerCase().includes("veraneio");
+
                 return (
                   <div
                     key={imovel.id}
@@ -361,7 +377,9 @@ export default function Home() {
                         </span>
                         <span
                           className={`text-[11px] font-black px-3 py-1 rounded-lg text-black uppercase tracking-wider shadow ${
-                            imovel.modalidade === "Venda"
+                            isTemporada
+                              ? "bg-gradient-to-r from-teal-400 to-emerald-400"
+                              : imovel.modalidade === "Venda"
                               ? "bg-gradient-to-r from-amber-500 to-amber-400"
                               : "bg-gradient-to-r from-amber-200 to-yellow-300"
                           }`}
@@ -388,22 +406,26 @@ export default function Home() {
                           <div>🛏️ {imovel.quartos} qts</div>
                           <div>🚿 {imovel.banheiros} ban</div>
                           <div>🚗 {imovel.vagas} vag</div>
-                          <div>📐 {imovel.areaUtil}m²</div>
+                          {isTemporada && imovel.capacidadePessoas && imovel.capacidadePessoas > 0 ? (
+                            <div>👥 {imovel.capacidadePessoas} pess</div>
+                          ) : (
+                            <div>📐 {imovel.areaUtil}m²</div>
+                          )}
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
                         <div>
                           <span className="text-[10px] text-neutral-400 block font-black uppercase tracking-wider">
-                            Valor do Imóvel
+                            {isTemporada ? "Valor da Diária" : imovel.modalidade.includes("Locação") ? "Aluguel Mensal" : "Valor de Venda"}
                           </span>
                           <span className="text-xl font-black text-amber-400">
-                            R$ {Number(imovel.preco).toLocaleString("pt-BR")}
+                            {formatarPreco(imovel)}
                           </span>
                         </div>
                         <a
                           href={`https://wa.me/55${imovel.corretor.telefone}?text=${encodeURIComponent(
-                            `Olá! Gostaria de mais informações sobre o imóvel ${imovel.titulo} (Ref: ${imovel.codigo})`
+                            `Olá! Gostaria de informações sobre o imóvel (${imovel.modalidade}) ${imovel.titulo} (Ref: ${imovel.codigo})`
                           )}`}
                           onClick={(e) => e.stopPropagation()}
                           target="_blank"
@@ -431,105 +453,28 @@ export default function Home() {
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-black text-white font-serif leading-tight">
                   É Corretor ou Imobiliária? <br className="hidden sm:inline" />
-                  <span className="text-amber-500">Anuncie seus imóveis sob a nossa guarda.</span>
+                  <span className="text-amber-500">Divulgue suas locações e vendas sob a nossa guarda.</span>
                 </h2>
                 <p className="text-xs sm:text-sm text-neutral-300 leading-relaxed max-w-2xl">
-                  Oferecemos uma plataforma tecnológica de ponta para divulgação dos seus anúncios. Conecte sua carteira de imóveis diretamente a clientes interessados e receba contatos direto no seu WhatsApp, sem intermediários.
+                  Plataforma moderna para conectar sua carteira de temporada e anual a turistas e novos moradores de todo o estado.
                 </p>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                  <div className="bg-black/60 border border-amber-600/20 p-3.5 rounded-2xl">
-                    <span className="text-amber-500 font-black text-base block mb-1">🚀 Alta Visibilidade</span>
-                    <span className="text-[11px] text-neutral-400">Exposição para clientes de Maringá e Litoral.</span>
-                  </div>
-                  <div className="bg-black/60 border border-amber-600/20 p-3.5 rounded-2xl">
-                    <span className="text-amber-500 font-black text-base block mb-1">⚡ Importador por Link</span>
-                    <span className="text-[11px] text-neutral-400">Cadastre imóveis em segundos colando a URL.</span>
-                  </div>
-                  <div className="bg-black/60 border border-amber-600/20 p-3.5 rounded-2xl">
-                    <span className="text-amber-500 font-black text-base block mb-1">📱 Lead no Seu Zap</span>
-                    <span className="text-[11px] text-neutral-400">O comprador entra em contato direto com você.</span>
-                  </div>
-                </div>
               </div>
 
               <div className="bg-black border border-amber-600/40 p-6 rounded-2xl text-center space-y-4 shadow-xl">
                 <h3 className="font-extrabold text-amber-400 text-lg">Quero Anunciar Meu Portfólio</h3>
-                <p className="text-xs text-neutral-400">
-                  Acesse nosso Portal do Corretor ou fale diretamente com a equipe da Esfinge para parcerias.
-                </p>
-                <div className="space-y-2.5 pt-2">
-                  <a
-                    href="/admin"
-                    className="block w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-3 rounded-xl text-xs transition shadow-lg uppercase tracking-wider"
-                  >
-                    👨‍💼 Acessar Painel do Corretor
-                  </a>
-                  <a
-                    href="https://wa.me/5544997278694?text=Olá!%20Sou%20corretor/imobiliária%20e%20gostaria%20de%20anunciar%20meus%20imóveis%20na%20Esfinge."
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block w-full bg-neutral-900 border border-amber-600/40 hover:bg-neutral-800 text-amber-400 font-bold py-3 rounded-xl text-xs transition"
-                  >
-                    💬 Falar sobre Parcerias no WhatsApp
-                  </a>
-                </div>
+                <a
+                  href="https://wa.me/5544997278694?text=Olá!%20Sou%20corretor/imobiliária%20e%20gostaria%20de%20anunciar%20meus%20imóveis%20na%20Esfinge."
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black font-black py-3 rounded-xl text-xs transition shadow-lg uppercase tracking-wider"
+                >
+                  💬 Falar no WhatsApp
+                </a>
               </div>
             </div>
           </section>
         </main>
       </div>
-
-      {/* FOOTER */}
-      <footer className="bg-black text-neutral-300 border-t border-amber-600/40 pt-16 pb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="space-y-4 md:col-span-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-tr from-amber-700 via-amber-600 to-amber-500 rounded-2xl flex items-center justify-center text-black font-black text-xl shadow-md border border-amber-400/30">
-                  🏰
-                </div>
-                <span className="font-black text-xl text-amber-500 tracking-wider font-serif">ESFINGE IMÓVEIS</span>
-              </div>
-
-              <div className="text-xs text-amber-200/90 space-y-1 font-mono bg-neutral-900/90 p-4 rounded-2xl border border-amber-600/30 max-w-md">
-                <p className="font-bold text-amber-400">VIP ARTE - & ESTRATEGIAS LTDA</p>
-                <p>CNPJ: 12.225.613/0001-06</p>
-                <p>Matinhos - Paraná</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-sm font-black text-amber-500 uppercase tracking-wider border-b border-amber-900/40 pb-2">Navegação</h4>
-              <ul className="space-y-2 text-xs font-medium">
-                <li><a href="/" className="hover:text-amber-400 transition">Vitrine de Imóveis</a></li>
-                <li><a href="/admin" className="hover:text-amber-400 transition">Área do Corretor / Admin</a></li>
-                <li><a href="https://wa.me/5544997278694" target="_blank" rel="noreferrer" className="hover:text-amber-400 transition">Atendimento via WhatsApp</a></li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-sm font-black text-amber-500 uppercase tracking-wider border-b border-amber-900/40 pb-2">Regiões Atendidas</h4>
-              <ul className="space-y-2 text-xs font-medium text-neutral-400">
-                <li>📍 Maringá e Região Metropolitana</li>
-                <li>🌊 Litoral do Paraná (Matinhos, Pontal do Paraná, Guaratuba)</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-neutral-900/80 border border-amber-600/20 text-xs text-neutral-400 leading-relaxed space-y-2">
-            <p className="font-bold text-amber-500 uppercase tracking-wider text-[11px]">📜 Termo de Isenção e Uso da Plataforma</p>
-            <p>
-              Este site não realiza atividades de corretagem ou intermediação imobiliária. A atividade de corretagem de imóveis é exercida de forma autônoma e exclusiva pelos corretores de imóveis e imobiliárias devidamente registrados nos órgãos competentes (CRECI).
-            </p>
-          </div>
-
-          <div className="pt-6 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 gap-4">
-            <p>© {new Date().getFullYear()} VIP ARTE - & ESTRATEGIAS LTDA. Todos os direitos reservados.</p>
-            <p className="text-amber-500/80 font-bold">Sob a Guarda da Esfinge 🛡️</p>
-          </div>
-        </div>
-      </footer>
 
       {/* MODAL DE DETALHES */}
       {imovelSelecionado && (
@@ -553,7 +498,7 @@ export default function Home() {
                 <span className="bg-black border border-amber-600/40 text-amber-400 text-[11px] font-black px-3 py-1 rounded-lg uppercase tracking-wider">
                   REF: {imovelSelecionado.codigo}
                 </span>
-                <span className={`text-[11px] font-black px-3 py-1 rounded-lg text-black uppercase tracking-wider ${imovelSelecionado.modalidade === 'Venda' ? 'bg-amber-400' : 'bg-amber-200'}`}>
+                <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-amber-400 text-black uppercase tracking-wider">
                   {imovelSelecionado.modalidade}
                 </span>
               </div>
@@ -562,24 +507,35 @@ export default function Home() {
                 📍 {imovelSelecionado.bairro}, {imovelSelecionado.cidade} • {imovelSelecionado.tipo}
               </p>
               <p className="text-3xl font-black text-amber-500 mt-3">
-                R$ {Number(imovelSelecionado.preco).toLocaleString("pt-BR")}
+                {formatarPreco(imovelSelecionado)}
               </p>
+              {imovelSelecionado.descricao && (
+                <p className="text-xs text-neutral-300 mt-3 leading-relaxed bg-black/40 p-3.5 rounded-xl border border-amber-600/20">
+                  {imovelSelecionado.descricao}
+                </p>
+              )}
             </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4 border-y border-neutral-800 text-center text-xs font-black text-amber-200">
               <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">🛏️ {imovelSelecionado.quartos} Quartos</div>
               <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">🚿 {imovelSelecionado.banheiros} Banheiros</div>
               <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">🚗 {imovelSelecionado.vagas} Vagas</div>
-              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">📐 {imovelSelecionado.areaUtil} m²</div>
+              <div className="bg-black/60 p-3 rounded-2xl border border-amber-600/20">
+                {imovelSelecionado.capacidadePessoas && imovelSelecionado.capacidadePessoas > 0
+                  ? `👥 ${imovelSelecionado.capacidadePessoas} Pessoas`
+                  : `📐 ${imovelSelecionado.areaUtil} m²`}
+              </div>
             </div>
+
             <div className="bg-black border border-amber-600/30 p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
               <div>
-                <span className="text-[10px] text-amber-500 font-black tracking-widest block uppercase">Corretor Responsável</span>
+                <span className="text-[10px] text-amber-500 font-black tracking-widest block uppercase">Atendimento</span>
                 <span className="font-extrabold text-white text-base">{imovelSelecionado.corretor.nome}</span>
                 <span className="text-xs text-neutral-400 block">CRECI: {imovelSelecionado.corretor.creci}</span>
               </div>
               <a
                 href={`https://wa.me/55${imovelSelecionado.corretor.telefone}?text=${encodeURIComponent(
-                  `Olá! Tenho interesse no imóvel ${imovelSelecionado.titulo} (Ref: ${imovelSelecionado.codigo})`
+                  `Olá! Gostaria de saber mais sobre a locação/venda do imóvel ${imovelSelecionado.titulo} (Ref: ${imovelSelecionado.codigo})`
                 )}`}
                 target="_blank"
                 rel="noreferrer"
