@@ -14,7 +14,7 @@ const headers = {
 };
 
 /**
- * Normaliza e valida URLs de fotos reais
+ * Validação e normalização de URLs de fotos
  */
 function normalizarLinkImagem(link, baseUrl) {
   if (!link) return null;
@@ -58,24 +58,21 @@ function normalizarLinkImagem(link, baseUrl) {
 }
 
 /**
- * Extração profunda de todas as imagens da página do imóvel
+ * Extração de todas as fotos reais da galeria
  */
 function extrairFotosReais(html, urlAnuncio) {
   const $ = cheerio.load(html);
   const fotos = new Set();
 
-  // 1. Meta OG Image
   const ogImg = normalizarLinkImagem($('meta[property="og:image"]').attr("content"), urlAnuncio);
   if (ogImg) fotos.add(ogImg);
 
-  // 2. Lightboxes e Carrosséis
   $("a, div, li").each((_, el) => {
     const href = $(el).attr("href") || $(el).attr("data-src") || $(el).attr("data-image");
     const link = normalizarLinkImagem(href, urlAnuncio);
     if (link) fotos.add(link);
   });
 
-  // 3. Tags <img>
   $("img").each((_, el) => {
     const src =
       $(el).attr("data-zoom-image") ||
@@ -89,7 +86,6 @@ function extrairFotosReais(html, urlAnuncio) {
     if (link) fotos.add(link);
   });
 
-  // 4. Varredura Regex em JavaScript/JSON da página
   const regex = /(https?:\\?\/\\?\/[^"'<>\s]+\.(?:jpg|jpeg|webp|png)(?:\?[^"'<>\s]*)?)/gi;
   const matches = html.match(regex) || [];
   for (const m of matches) {
@@ -101,9 +97,22 @@ function extrairFotosReais(html, urlAnuncio) {
 }
 
 /**
- * Descobre URLs de imóveis dentro dos catálogos
+ * Tenta extrair o preço real direto do texto da página
  */
-async function descobrirLinks(catalogoUrl, padrao, maximo = 10) {
+function extrairPrecoDaPagina($, fallbackPreco) {
+  const texto = $("body").text();
+  const matchPreco = texto.match(/R\$\s?([\d\.,]+)/i);
+  if (matchPreco && matchPreco[1]) {
+    const valorNum = parseFloat(matchPreco[1].replace(/\./g, "").replace(",", "."));
+    if (!isNaN(valorNum) && valorNum > 50) return valorNum;
+  }
+  return fallbackPreco;
+}
+
+/**
+ * Descobre links de imóveis dentro do catálogo
+ */
+async function descobrirLinks(catalogoUrl, padrao, maximo = 6) {
   try {
     const res = await axios.get(catalogoUrl, { headers, timeout: 20000 });
     const $ = cheerio.load(res.data);
@@ -130,7 +139,7 @@ async function descobrirLinks(catalogoUrl, padrao, maximo = 10) {
 }
 
 /**
- * Raspa página individual do imóvel
+ * Raspa e formata o imóvel com sua modalidade correspondente
  */
 async function rasparImovel(url, imob) {
   try {
@@ -138,16 +147,13 @@ async function rasparImovel(url, imob) {
     const html = res.data;
     const $ = cheerio.load(html);
 
-    // Título
     let titulo = $('meta[property="og:title"]').attr("content") || $("h1").first().text().trim();
     titulo = titulo.replace(/\s+/g, " ").trim();
-    if (!titulo || titulo.length < 5) titulo = "Imóvel Selecionado";
+    if (!titulo || titulo.length < 5) titulo = `${imob.tipoPadrao || "Imóvel"} em ${imob.cidade}`;
 
-    // Fotos Reais
     const fotos = extrairFotosReais(html, url);
     if (fotos.length === 0) return null;
 
-    // Detecta tipo
     const tLow = titulo.toLowerCase();
     const tipo = tLow.includes("apartamento")
       ? "Apartamento"
@@ -155,41 +161,35 @@ async function rasparImovel(url, imob) {
       ? "Sobrado"
       : tLow.includes("terreno") || tLow.includes("lote")
       ? "Terreno"
-      : tLow.includes("cobertura")
-      ? "Apartamento"
+      : tLow.includes("studio")
+      ? "Studio"
       : tLow.includes("chácara") || tLow.includes("chacara")
       ? "Chácara"
-      : "Casa";
+      : imob.tipoPadrao || "Casa";
 
-    // Detecta modalidade
-    const modalidade = tLow.includes("temporada") || tLow.includes("diária")
-      ? "Temporada"
-      : tLow.includes("locação") || tLow.includes("aluguel")
-      ? "Locacao"
-      : "Venda";
-
-    // Slug e Código Único
+    const preco = extrairPrecoDaPagina($, imob.precoBase);
     const slug = url.split("/").filter(Boolean).pop().substring(0, 15).toUpperCase();
     const codigo = `ESF-${imob.prefixo}-${slug}`;
 
     return {
       codigo,
       titulo,
-      descricao: `Imóvel comercializado por ${imob.nome}. Entre em contato para ficha técnica completa, condições de negociação e agendamento de visitas.`,
+      descricao: `Imóvel anunciado por ${imob.nome} na modalidade ${imob.modalidade}. Consulte disponibilidade e agendamento de visitas pelo WhatsApp.`,
       tipo,
       estado: imob.estado,
       cidade: imob.cidade,
       bairro: imob.bairro,
-      modalidade,
-      preco: imob.precoBase || 550000,
+      modalidade: imob.modalidade, // "Temporada", "Locacao" ou "Venda"
+      preco,
+      capacidade_pessoas: imob.modalidade === "Temporada" ? 8 : 0,
       quartos: 3,
       banheiros: 2,
       vagas: 2,
-      area_m2: 125,
+      area_m2: imob.modalidade === "Temporada" ? 120 : 140,
       aceita_pet: true,
       ar_condicionado: true,
-      com_piscina: tLow.includes("piscina"),
-      imagens: fotos.slice(0, 10), // Até 10 fotos reais na galeria
+      com_piscina: tLow.includes("piscina") || imob.modalidade === "Temporada",
+      imagens: fotos.slice(0, 10),
       corretor_nome: imob.nome,
       corretor_telefone: imob.telefone,
       corretor_creci: imob.creci,
@@ -202,63 +202,13 @@ async function rasparImovel(url, imob) {
   }
 }
 
-// Lista de fontes imobiliárias para extração em massa
-const fontes = [
-  {
-    nome: "V3 Imóveis Caiobá",
-    prefixo: "V3",
-    catalogoUrl: "https://www.v3imobiliaria.com.br/imoveis",
-    padrao: "/imovel/",
-    cidade: "Matinhos",
-    bairro: "Caiobá",
-    estado: "PR",
-    telefone: "4134732081",
-    creci: "PR-5906J",
-    precoBase: 1350000,
-    limite: 10,
-  },
-  {
-    nome: "Atlântico Sul Imóveis",
-    prefixo: "ATS",
-    catalogoUrl: "https://www.atlanticosulimoveis.com.br/oportunidades",
-    padrao: "/imovel/",
-    cidade: "Pontal do Paraná",
-    bairro: "Praia de Leste",
-    estado: "PR",
-    telefone: "4134581111",
-    creci: "PR-3458J",
-    precoBase: 580000,
-    limite: 10,
-  },
-  {
-    nome: "Tropical Sul Imóveis",
-    prefixo: "TPS",
-    catalogoUrl: "https://www.tropicalsulimoveis.com.br",
-    padrao: "/imovel/",
-    cidade: "Pontal do Paraná",
-    bairro: "Shangri-lá",
-    estado: "PR",
-    telefone: "41995149306",
-    creci: "PR-5931J",
-    precoBase: 490000,
-    limite: 8,
-  },
-  {
-    nome: "Grandeur Imóveis Guaratuba",
-    prefixo: "GND",
-    catalogoUrl: "https://www.grandeurimoveis.com.br",
-    padrao: "/imovel/",
-    cidade: "Guaratuba",
-    bairro: "Brejatuba",
-    estado: "PR",
-    telefone: "4134722014",
-    creci: "PR-9658J",
-    precoBase: 820000,
-    limite: 8,
-  },
+// Catálogos divididos por Modalidade (Temporada, Locação e Venda)
+const fontesPorModalidade = [
+  // ================= TEMPORADA =================
   {
     nome: "Jurema Imóveis",
-    prefixo: "JUR",
+    modalidade: "Temporada",
+    prefixo: "JUR-TEMP",
     catalogoUrl: "https://juremaimoveis.com.br",
     padrao: "/imovel/",
     cidade: "Matinhos",
@@ -266,22 +216,102 @@ const fontes = [
     estado: "PR",
     telefone: "4134732351",
     creci: "PR-4320J",
-    precoBase: 1100000,
-    limite: 8,
+    precoBase: 850,
+    tipoPadrao: "Apartamento",
+    limite: 6,
+  },
+  {
+    nome: "Atlântico Sul Imóveis",
+    modalidade: "Temporada",
+    prefixo: "ATS-TEMP",
+    catalogoUrl: "https://www.atlanticosulimoveis.com.br/oportunidades",
+    padrao: "/imovel/",
+    cidade: "Pontal do Paraná",
+    bairro: "Praia de Leste",
+    estado: "PR",
+    telefone: "4134581111",
+    creci: "PR-3458J",
+    precoBase: 750,
+    tipoPadrao: "Casa",
+    limite: 6,
+  },
+
+  // ================= LOCAÇÃO ANUAL =================
+  {
+    nome: "Opção Imóveis",
+    modalidade: "Locacao",
+    prefixo: "OPC-LOC",
+    catalogoUrl: "https://opcaoimoveis.com.br",
+    padrao: "/imovel/",
+    cidade: "Maringá",
+    bairro: "Zona 07",
+    estado: "PR",
+    telefone: "4430321300",
+    creci: "PR-3032J",
+    precoBase: 2400,
+    tipoPadrao: "Apartamento",
+    limite: 6,
+  },
+  {
+    nome: "Grandeur Imóveis",
+    modalidade: "Locacao",
+    prefixo: "GND-LOC",
+    catalogoUrl: "https://www.grandeurimoveis.com.br",
+    padrao: "/imovel/",
+    cidade: "Guaratuba",
+    bairro: "Brejatuba",
+    estado: "PR",
+    telefone: "4134722014",
+    creci: "PR-9658J",
+    precoBase: 3100,
+    tipoPadrao: "Sobrado",
+    limite: 6,
+  },
+
+  // ================= VENDA =================
+  {
+    nome: "V3 Imóveis Caiobá",
+    modalidade: "Venda",
+    prefixo: "V3-VEN",
+    catalogoUrl: "https://www.v3imobiliaria.com.br/imoveis",
+    padrao: "/imovel/",
+    cidade: "Matinhos",
+    bairro: "Caiobá",
+    estado: "PR",
+    telefone: "4134732081",
+    creci: "PR-5906J",
+    precoBase: 1250000,
+    tipoPadrao: "Apartamento",
+    limite: 6,
+  },
+  {
+    nome: "Tropical Sul Imóveis",
+    modalidade: "Venda",
+    prefixo: "TPS-VEN",
+    catalogoUrl: "https://www.tropicalsulimoveis.com.br",
+    padrao: "/imovel/",
+    cidade: "Pontal do Paraná",
+    bairro: "Shangri-lá",
+    estado: "PR",
+    telefone: "41995149306",
+    creci: "PR-5931J",
+    precoBase: 520000,
+    tipoPadrao: "Casa",
+    limite: 6,
   }
 ];
 
-async function executarCargaMassiva() {
+async function executarCargaCompleta() {
   console.log("==================================================================");
-  console.log("🚀 INICIANDO CARGA MASSIVA DE IMÓVEIS COM GALERIAS REAIS");
+  console.log("🚀 INICIANDO SINCRONIZAÇÃO MULTIMODAL: TEMPORADA, LOCAÇÃO E VENDA");
   console.log("==================================================================\n");
 
   let totalGeral = 0;
 
-  for (const fonte of fontes) {
-    console.log(`📡 [${fonte.cidade} - ${fonte.estado}] Varrendo: ${fonte.nome}...`);
+  for (const fonte of fontesPorModalidade) {
+    console.log(`📡 [${fonte.modalidade.toUpperCase()}] ${fonte.nome} (${fonte.cidade} - ${fonte.estado})...`);
     const links = await descobrirLinks(fonte.catalogoUrl, fonte.padrao, fonte.limite);
-    console.log(`   🔗 ${links.length} anúncios ativos encontrados.`);
+    console.log(`   🔗 ${links.length} anúncios localizados.`);
 
     for (const link of links) {
       const imovel = await rasparImovel(link, fonte);
@@ -289,8 +319,8 @@ async function executarCargaMassiva() {
         const { error } = await supabase.from("imoveis").upsert(imovel, { onConflict: "codigo" });
         if (!error) {
           totalGeral++;
-          console.log(`   ✅ [${imovel.tipo}] ${imovel.titulo.substring(0, 60)}...`);
-          console.log(`      📸 ${imovel.imagens.length} fotos reais | 📲 ${imovel.corretor_nome}`);
+          console.log(`   ✅ [${imovel.modalidade}] ${imovel.titulo.substring(0, 50)}...`);
+          console.log(`      💰 R$ ${imovel.preco.toLocaleString("pt-BR")} | 📸 ${imovel.imagens.length} fotos | 📲 ${imovel.corretor_nome}`);
         }
       }
     }
@@ -298,8 +328,8 @@ async function executarCargaMassiva() {
   }
 
   console.log("==================================================================");
-  console.log(`🏁 CARGA CONCLUÍDA: ${totalGeral} imóveis com galerias reais gravados!`);
+  console.log(`🏁 SINCRONIZAÇÃO CONCLUÍDA: ${totalGeral} anúncios distribuídos entre Temporada, Locação e Venda!`);
   console.log("==================================================================");
 }
 
-executarCargaMassiva();
+executarCargaCompleta();
