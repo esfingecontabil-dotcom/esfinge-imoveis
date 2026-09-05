@@ -1,0 +1,32 @@
+name: 🤖 Sincronização Automática de Imóveis
+
+on:
+  # 1. Executa automaticamente todos os dias às 03:00 da madrugada (horário de Brasília = 06:00 UTC)
+  schedule:
+    - cron: "0 6 * * *"
+
+  # 2. Permite disparar manualmente com 1 clique pelo painel do GitHub
+  workflow_dispatch:
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Clonar repositório
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 📦 Instalar dependências de raspagem
+        run: npm install cheerio axios @supabase/supabase-js
+
+      - name: 🚀 Executar Robô Extrator de Fotos e Imóveis Reais
+        run: node capturar_anuncios_reais.mjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://oohtiefgaelsmvgvtezd.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_G91IjU8iNkKEUjs6o-FFIA_Z3gqUF8B' }}
