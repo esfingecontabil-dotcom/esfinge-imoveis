@@ -42,6 +42,8 @@ const CATEGORIAS = [
   { id: "Sobrado", label: "Sobrados", icon: "🏡" },
   { id: "Studio", label: "Studios", icon: "🛋️" },
   { id: "Chácara", label: "Chácaras", icon: "🌾" },
+  { id: "Comercial", label: "Comercial", icon: "🏬" },
+  { id: "Terreno", label: "Terrenos", icon: "📐" },
 ];
 
 export default function Home() {
@@ -56,14 +58,13 @@ export default function Home() {
   const [cidadeSelecionada, setCidadeSelecionada] = useState<string>("Todas");
   const [apenasPet, setApenasPet] = useState(false);
   const [apenasAr, setApenasAr] = useState(false);
-  const [favoritos, setFavoritos] = useState<(number | string)[]>([]);
 
-  // Localização & Modal
+  // Localização & Modal de Fotos
   const [localizacaoDetectada, setLocalizacaoDetectada] = useState<{ cidade: string; estado: string } | null>(null);
   const [imovelSelecionado, setImovelSelecionado] = useState<Imovel | null>(null);
   const [fotoAtivaIndex, setFotoAtivaIndex] = useState<number>(0);
 
-  // Carregar Imóveis
+  // Carregar Imóveis do Supabase
   useEffect(() => {
     async function carregarImoveis() {
       try {
@@ -135,7 +136,7 @@ export default function Home() {
     carregarImoveis();
   }, []);
 
-  // Geolocalização
+  // Detecção de Geolocalização
   useEffect(() => {
     async function detectarGeo() {
       try {
@@ -152,7 +153,7 @@ export default function Home() {
           }
         }
       } catch (e) {
-        console.log("Não foi possível detectar localização.");
+        console.log("Não foi possível detectar geolocalização.");
       }
     }
 
@@ -173,14 +174,27 @@ export default function Home() {
     return ["Todas", ...Array.from(new Set(lista)).filter(Boolean)];
   }, [imoveis, estadoSelecionado]);
 
+  // Normalização e Identificação da Modalidade
+  const obterTipoModalidade = (imovel: Imovel) => {
+    const mod = (imovel.modalidade || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (mod.includes("temporada") || mod.includes("veraneio") || mod.includes("diaria")) {
+      return "Temporada";
+    }
+    if (mod.includes("loca") || mod.includes("alug") || mod.includes("mensal") || mod.includes("anual")) {
+      return "Locacao";
+    }
+    return "Venda";
+  };
+
   const formatarPreco = (imovel: Imovel) => {
     const val = Number(imovel.preco).toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
     });
-    const mod = imovel.modalidade.toLowerCase();
-    if (mod.includes("temporada") || mod.includes("veraneio")) return `${val} / diária`;
-    if (mod.includes("aluguel") || mod.includes("locação") || mod.includes("locacao")) return `${val} / mês`;
+    const tipoMod = obterTipoModalidade(imovel);
+
+    if (tipoMod === "Temporada" && imovel.preco <= 15000) return `${val} / diária`;
+    if (tipoMod === "Locacao" && imovel.preco <= 35000) return `${val} / mês`;
     return val;
   };
 
@@ -189,30 +203,34 @@ export default function Home() {
     return `https://wa.me/${imovel.corretor.telefone}?text=${encodeURIComponent(texto)}`;
   };
 
+  // Filtragem Inteligente com Normalização de Caracteres
   const imoveisFiltrados = useMemo(() => {
     return imoveis.filter((imovel) => {
+      // 1. Busca por texto
       if (buscaTexto.trim() !== "") {
-        const termo = buscaTexto.toLowerCase();
-        const matchTitulo = imovel.titulo.toLowerCase().includes(termo);
-        const matchBairro = imovel.bairro.toLowerCase().includes(termo);
-        const matchCidade = imovel.cidade.toLowerCase().includes(termo);
+        const termo = buscaTexto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const matchTitulo = imovel.titulo.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(termo);
+        const matchBairro = imovel.bairro.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(termo);
+        const matchCidade = imovel.cidade.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(termo);
         const matchCodigo = imovel.codigo.toLowerCase().includes(termo);
         const matchCorretor = imovel.corretor.nome.toLowerCase().includes(termo);
         if (!matchTitulo && !matchBairro && !matchCidade && !matchCodigo && !matchCorretor) return false;
       }
 
+      // 2. Localização e Tipo
       if (estadoSelecionado !== "Todos" && imovel.estado.toLowerCase() !== estadoSelecionado.toLowerCase()) return false;
       if (cidadeSelecionada !== "Todas" && imovel.cidade.toLowerCase() !== cidadeSelecionada.toLowerCase()) return false;
       if (categoriaSelecionada !== "Todos" && imovel.tipo.toLowerCase() !== categoriaSelecionada.toLowerCase()) return false;
 
+      // 3. Modalidade (Temporada / Locação / Venda)
       if (modalidade !== "Todos") {
-        const modImovel = imovel.modalidade.toLowerCase();
-        const modFiltro = modalidade.toLowerCase();
-        if (modFiltro === "temporada" && !modImovel.includes("temporada") && !modImovel.includes("veraneio")) return false;
-        if (modFiltro === "locacao" && !modImovel.includes("anual") && !modImovel.includes("aluguel") && !modImovel.includes("locação")) return false;
-        if (modFiltro === "venda" && !modImovel.includes("venda")) return false;
+        const tipoMod = obterTipoModalidade(imovel);
+        if (modalidade === "Temporada" && tipoMod !== "Temporada") return false;
+        if (modalidade === "Locacao" && tipoMod !== "Locacao") return false;
+        if (modalidade === "Venda" && tipoMod !== "Venda") return false;
       }
 
+      // 4. Tags
       if (apenasPet && !imovel.aceitaPet) return false;
       if (apenasAr && !imovel.arCondicionado) return false;
 
@@ -240,7 +258,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-neutral-950 font-sans text-neutral-100 flex flex-col justify-between selection:bg-amber-600 selection:text-black">
       <div>
-        {/* HEADER */}
+        {/* CABEÇALHO */}
         <header className="sticky top-0 z-40 bg-black/95 backdrop-blur-md border-b border-amber-600/30 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-22 flex items-center justify-between gap-4 py-3">
             <div className="flex items-center space-x-3 shrink-0">
@@ -275,6 +293,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* BARRA DE CATEGORIAS */}
           <div className="border-t border-amber-900/30 bg-black/90">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center space-x-2 overflow-x-auto no-scrollbar">
               {CATEGORIAS.map((cat) => (
@@ -295,7 +314,7 @@ export default function Home() {
           </div>
         </header>
 
-        {/* FILTROS E CONTEÚDO */}
+        {/* ÁREA PRINCIPAL */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-8 pb-16">
           {localizacaoDetectada?.cidade && (
             <div className="bg-amber-950/40 border border-amber-600/30 rounded-2xl px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -317,6 +336,7 @@ export default function Home() {
             </div>
           )}
 
+          {/* PAINEL DE FILTROS */}
           <div className="bg-neutral-900/90 p-6 sm:p-8 rounded-3xl border border-amber-600/30 shadow-2xl space-y-5">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="w-full md:w-5/12 relative">
@@ -404,15 +424,26 @@ export default function Home() {
             </div>
           </div>
 
+          {/* GRID DE IMÓVEIS */}
           {loading ? (
-            <div className="text-center py-24 text-amber-500/60 font-bold">Carregando vitrine...</div>
+            <div className="text-center py-24 text-amber-500/60 font-bold text-base">Carregando vitrine de imóveis...</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {imoveisFiltrados.map((imovel) => {
-                const isFav = favoritos.includes(imovel.id);
-                const isTemporada =
-                  imovel.modalidade.toLowerCase().includes("temporada") ||
-                  imovel.modalidade.toLowerCase().includes("veraneio");
+                const tipoMod = obterTipoModalidade(imovel);
+                const rotuloModalidade =
+                  tipoMod === "Temporada"
+                    ? "TEMPORADA"
+                    : tipoMod === "Locacao"
+                    ? "LOCAÇÃO"
+                    : "VENDA";
+
+                const rotuloPreco =
+                  tipoMod === "Temporada"
+                    ? "VALOR DA DIÁRIA"
+                    : tipoMod === "Locacao"
+                    ? "ALUGUEL MENSAL"
+                    : "VALOR DE VENDA";
 
                 return (
                   <div
@@ -432,8 +463,16 @@ export default function Home() {
                         <span className="bg-black/90 text-amber-400 border border-amber-600/40 text-[11px] font-black px-3 py-1 rounded-lg">
                           REF: {imovel.codigo}
                         </span>
-                        <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-amber-500 text-black uppercase">
-                          {imovel.modalidade}
+                        <span
+                          className={`text-[11px] font-black px-3 py-1 rounded-lg uppercase ${
+                            tipoMod === "Temporada"
+                              ? "bg-amber-500 text-black"
+                              : tipoMod === "Locacao"
+                              ? "bg-blue-500 text-white"
+                              : "bg-emerald-500 text-black"
+                          }`}
+                        >
+                          {rotuloModalidade}
                         </span>
                       </div>
 
@@ -474,7 +513,7 @@ export default function Home() {
                       <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
                         <div>
                           <span className="text-[10px] text-neutral-400 block font-black uppercase">
-                            {isTemporada ? "Valor da Diária" : "Valor de Venda"}
+                            {rotuloPreco}
                           </span>
                           <span className="text-xl font-black text-amber-400">
                             {formatarPreco(imovel)}
@@ -499,7 +538,7 @@ export default function Home() {
         </main>
       </div>
 
-      {/* MODAL DE DETALHES COM GALERIA COMPLETA DE FOTOS */}
+      {/* MODAL DE DETALHES COM GALERIA COMPLETA */}
       {imovelSelecionado && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-neutral-900 border border-amber-600/40 rounded-3xl max-w-3xl w-full p-6 sm:p-8 relative shadow-2xl space-y-6 max-h-[92vh] overflow-y-auto text-neutral-100">
@@ -510,7 +549,7 @@ export default function Home() {
               ✕
             </button>
 
-            {/* FOTO PRINCIPAL COM SETAS DE NAVEGAÇÃO */}
+            {/* FOTO PRINCIPAL COM NAVEGAÇÃO */}
             <div className="relative aspect-[16/10] bg-black rounded-2xl overflow-hidden shadow-2xl border border-amber-600/30 group">
               <img
                 src={imovelSelecionado.imagens[fotoAtivaIndex]}
@@ -518,7 +557,6 @@ export default function Home() {
                 className="w-full h-full object-cover transition-all duration-300"
               />
 
-              {/* Botões de Navegação Anterior/Próxima */}
               {imovelSelecionado.imagens.length > 1 && (
                 <>
                   <button
@@ -536,7 +574,6 @@ export default function Home() {
                 </>
               )}
 
-              {/* Indicador de Quantidade */}
               <div className="absolute bottom-3 right-3 bg-black/80 border border-amber-600/40 px-3 py-1 rounded-full text-xs font-black text-amber-300 shadow">
                 📸 {fotoAtivaIndex + 1} de {imovelSelecionado.imagens.length}
               </div>
@@ -566,8 +603,20 @@ export default function Home() {
                 <span className="bg-black border border-amber-600/40 text-amber-400 text-[11px] font-black px-3 py-1 rounded-lg">
                   REF: {imovelSelecionado.codigo}
                 </span>
-                <span className="text-[11px] font-black px-3 py-1 rounded-lg bg-amber-400 text-black uppercase">
-                  {imovelSelecionado.modalidade}
+                <span
+                  className={`text-[11px] font-black px-3 py-1 rounded-lg uppercase ${
+                    obterTipoModalidade(imovelSelecionado) === "Temporada"
+                      ? "bg-amber-500 text-black"
+                      : obterTipoModalidade(imovelSelecionado) === "Locacao"
+                      ? "bg-blue-500 text-white"
+                      : "bg-emerald-500 text-black"
+                  }`}
+                >
+                  {obterTipoModalidade(imovelSelecionado) === "Temporada"
+                    ? "TEMPORADA"
+                    : obterTipoModalidade(imovelSelecionado) === "Locacao"
+                    ? "LOCAÇÃO"
+                    : "VENDA"}
                 </span>
               </div>
               <h2 className="text-2xl font-black text-amber-400 mt-3">{imovelSelecionado.titulo}</h2>
