@@ -1,9 +1,9 @@
-name: 🤖 Sincronização Automática de Imóveis
+name: 🤖 Sincronização e Autodescoberta de Imóveis
 
 on:
   schedule:
-    - cron: "0 6 * * *" # Executa diariamente às 03:00 (Brasília)
-  workflow_dispatch: # Permite disparo manual com 1 clique
+    - cron: "0 6 * * *" # Diariamente às 03:00 (Horário de Brasília)
+  workflow_dispatch:
 
 jobs:
   sincronizar:
@@ -21,17 +21,10 @@ jobs:
       - name: 📦 Instalar dependências
         run: npm install cheerio axios @supabase/supabase-js
 
-      - name: 🚀 Executar Robô de Varredura
+      - name: 🚀 Executar Autodescoberta e Extração Massiva
         env:
           NEXT_PUBLIC_SUPABASE_URL: "https://oohtiefgaelsmvgvtezd.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_G91IjU8iNkKEUjs6o-FFIA_Z3gqUF8B"
         run: |
-          if [ -f "capturar_anuncios_exatos.mjs" ]; then
-            node capturar_anuncios_exatos.mjs
-          elif [ -f "crawler_universal_todas.mjs" ]; then
-            node crawler_universal_todas.mjs
-          elif [ -f "carga_massiva_imoveis.mjs" ]; then
-            node carga_massiva_imoveis.mjs
-          else
-            node capturar_anuncios_reais.mjs
-          fi
+          node capturar_anuncios_exatos.mjs
+          node autodescoberta_e_raspagem.mjs
