@@ -8,6 +8,7 @@ export interface Imovel {
   id: number | string;
   codigo: string;
   titulo: string;
+  destaque?: boolean;
   descricao?: string;
   tipo: string;
   estado: string;
@@ -64,19 +65,22 @@ export default function Home() {
   const [imovelSelecionado, setImovelSelecionado] = useState<Imovel | null>(null);
   const [fotoAtivaIndex, setFotoAtivaIndex] = useState<number>(0);
 
-  // Carregar Imóveis do Supabase
+  // Carregar Imóveis do Supabase com Paginação Paralela + Destaques + Randomização
   useEffect(() => {
     async function carregarImoveis() {
       try {
-        const { data, error } = await supabase
-          .from("imoveis")
-          .select("*")
-          .order("id", { ascending: false });
+        // Busca paralela em dois blocos para superar o teto de 1.000 linhas da API do Supabase
+        const [bloco1, bloco2] = await Promise.all([
+          supabase.from("imoveis").select("*").range(0, 999),
+          supabase.from("imoveis").select("*").range(1000, 1999),
+        ]);
 
-        if (error) {
-          console.error("Erro ao carregar do Supabase:", error.message);
+        if (bloco1.error) {
+          console.error("Erro ao carregar do Supabase (bloco 1):", bloco1.error.message);
           return;
         }
+
+        const data = [...(bloco1.data || []), ...(bloco2.data || [])];
 
         if (data && data.length > 0) {
           const formatados: Imovel[] = data.map((item: any) => {
@@ -93,9 +97,10 @@ export default function Home() {
             const telefoneFormatado = telBruto.startsWith("55") ? telBruto : `55${telBruto}`;
 
             return {
-              id: item.id,
-              codigo: item.codigo || `ESF-${item.id}`,
+              id: item.id || item.codigo || Math.random(),
+              codigo: item.codigo || `ESF-${item.id || "001"}`,
               titulo: item.titulo || "Imóvel em Destaque",
+              destaque: Boolean(item.destaque || item.em_destaque || item.is_destaque),
               descricao: item.descricao || "",
               tipo: item.tipo || "Casa",
               estado: item.estado || "PR",
@@ -124,10 +129,24 @@ export default function Home() {
             };
           });
 
-          setImoveis(formatados);
+          // Algoritmo de embaralhamento Fisher-Yates
+          const embaralhar = (lista: Imovel[]) => {
+            const copia = [...lista];
+            for (let i = copia.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [copia[i], copia[j]] = [copia[j], copia[i]];
+            }
+            return copia;
+          };
+
+          // Separação em dois grupos: destaques no topo e regulares em seguida (ambos rotativos)
+          const destaquesRotativos = embaralhar(formatados.filter((imv) => imv.destaque));
+          const regularesRotativos = embaralhar(formatados.filter((imv) => !imv.destaque));
+
+          setImoveis([...destaquesRotativos, ...regularesRotativos]);
         }
       } catch (err) {
-        console.error("Erro ao buscar imóveis:", err);
+        console.error("Erro inesperado ao buscar imóveis:", err);
       } finally {
         setLoading(false);
       }
@@ -460,6 +479,11 @@ export default function Home() {
                       <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-transparent opacity-80"></div>
 
                       <div className="absolute top-4 left-4 flex flex-col gap-1.5 items-start z-10">
+                        {imovel.destaque && (
+                          <span className="bg-gradient-to-r from-amber-500 to-yellow-400 text-black text-[10px] font-black px-2.5 py-1 rounded-lg shadow flex items-center gap-1">
+                            ⭐ DESTAQUE
+                          </span>
+                        )}
                         <span className="bg-black/90 text-amber-400 border border-amber-600/40 text-[11px] font-black px-3 py-1 rounded-lg">
                           REF: {imovel.codigo}
                         </span>
@@ -600,6 +624,11 @@ export default function Home() {
 
             <div>
               <div className="flex items-center gap-2">
+                {imovelSelecionado.destaque && (
+                  <span className="bg-gradient-to-r from-amber-500 to-yellow-400 text-black text-[10px] font-black px-2.5 py-1 rounded-lg shadow flex items-center gap-1">
+                    ⭐ DESTAQUE
+                  </span>
+                )}
                 <span className="bg-black border border-amber-600/40 text-amber-400 text-[11px] font-black px-3 py-1 rounded-lg">
                   REF: {imovelSelecionado.codigo}
                 </span>
